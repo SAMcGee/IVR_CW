@@ -75,9 +75,9 @@ class image_converter:
         self.robot_joint3_pub.publish(joint3)
         self.robot_joint4_pub.publish(joint4)
 
-    """
+    '''
     Returns midpoint of the circle of the specified color in the image provided.
-    """
+    '''
 
     def detect_color(image, color):
         if color == "blue":
@@ -98,6 +98,31 @@ class image_converter:
         cy = int(moments['m01'] / moments('m00'))
         return np.array([cx, cy])
 
+    def pixel2meter(self, image):
+        circle1Pos = self.detect_color(image, "yellow")
+        circle2Pos = self.detect_color(image, "blue")
+        dist = np.sum((circle1Pos - circle2Pos) ** 2)
+        # 2.5 is the length of the first link (between yellow and blue)
+        return (2.5 / np.sqrt(dist))
+
+    '''
+    Currently erroneously assuming that all joints are always visible in one camera
+    The blue joint however rotates around both y and x axes, so this is not the case
+    and both cameras will need to be used to accomodate for this 
+    '''
+    def detect_joint_angles(self,image):
+        a = self.pixel2meter(self,image)
+        # Centre-points of each blob
+        center = a * self.detect_color("yellow")
+        circle1Pos = a * self.detect_color("blue")
+        circle2Pos = a * self.detect_color("green")
+        circle3Pos = a * self.detect_color("red")
+        # Joint angles, solved with trig
+        ja1 = np.arctan2(center[0] - circle1Pos[0], center[1] - circle1Pos[1])
+        ja2 = np.arctan2(circle1Pos[0] - circle2Pos[0], circle1Pos[1] - circle2Pos[1]) - ja1
+        ja3 = np.arctan2(circle2Pos[0] - circle3Pos[0], circle2Pos[1] - circle3Pos[1]) - ja2 - ja1
+
+        return np.array([ja1,ja2,ja3])
 
 # call the class
 def main(args):
