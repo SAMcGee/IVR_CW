@@ -12,7 +12,6 @@ from std_msgs.msg import Float64MultiArray, Float64
 from cv_bridge import CvBridge, CvBridgeError
 from matplotlib import pyplot as plt
 
-
 class image_converter:
 
     # Defines publisher and subscriber
@@ -68,7 +67,6 @@ class image_converter:
         except CvBridgeError as e:
             print(e)
 
-        # Uncomment if you want to save the image
         # cv2.imwrite('image_2.png', self.cv_image2)
         # j2 = cv2.imshow('window2', self.cv_image2)
         cv2.waitKey(1)
@@ -100,10 +98,6 @@ class image_converter:
         self.robot_joint3_pub.publish(self.joint3)
         self.robot_joint4_pub.publish(self.joint4)
 
-    '''
-    Returns midpoint of the circle of the specified color in the image provided.
-    '''
-
     def detect_color(self, image, color):
         if color == "blue":
             mask = cv2.inRange(image, (100, 0, 0), (255, 0, 0))
@@ -113,18 +107,14 @@ class image_converter:
             mask = cv2.inRange(image, (0, 0, 100), (0, 0, 255))
         elif color == "yellow":
             mask = cv2.inRange(image, (0, 100, 100), (0, 255, 255))
+        elif color == "orange":
+            mask = cv2.inRange(image, (0, 100, 100), (0, 128, 255))
         else:
             raise Exception("Attempting to detect undefined color")
 
         kernel = np.ones((5, 5), np.uint8)
         mask = cv2.dilate(mask, kernel, iterations=3)
         moments = cv2.moments(mask)
-
-        if (moments['m00'] == 0):
-            if (np.array_equal(image, self.cv_image1)):
-                return self.detect_color(self.cv_image2,color)
-            else:
-                return self.detect_color(self.cv_image1, color)
 
         cx = int(moments['m10'] / moments['m00'])
         cy = int(moments['m01'] / moments['m00'])
@@ -138,11 +128,6 @@ class image_converter:
         # 2.5 is the length of the first link (between yellow and blue)
         return 2.5 / np.sqrt(dist)
 
-    '''
-    Currently erroneously assuming that all joints are always visible in one camera
-    The blue joint however rotates around both y and x axes, so this is not the case
-    and both cameras will need to be used to accomodate for this 
-    '''
     def detect_joint_angles(self,image1 , image2):
         a = self.pixel2meter(image1) # Will be the same in second image because it doesn't move
 
@@ -158,43 +143,57 @@ class image_converter:
         im2circle2Pos = a * self.detect_color(image2, "green")
         im2circle3Pos = a * self.detect_color(image2, "red")
 
-        # These are always 0 but they could be calculated as follows
-        im1ja1 = 0 # np.arctan2(im1center[0] - im1circle1Pos[0], im1center[1] - im1circle1Pos[0]) # yellow and blue
-        im2ja1 = 0 # np.arctan2(im2center[0] - im2circle1Pos[0], im2center[1] - im2circle1Pos[0])
+        # Camera 1 gives us (y,z)
+        # Camera 2 gives us (x,z)
+        # So z should be the same across either, we derive the x,y,z positions as follows
+        # There are small differences in z between them but it won't effect calculations
 
-        # blue and green (TODO: Distinguish between x and y rotation in the angle)
-        ja2 = np.arctan2(im1circle1Pos[0] - im1circle2Pos[0], im1circle1Pos[1] - im1circle2Pos[1]) - im1ja1
-        ja3 = np.arctan2(im2circle2Pos[0] - im2circle1Pos[0], im2circle1Pos[1] - im2circle2Pos[1]) - im2ja1
+        yellowCoordinates = np.array([im2center[0],im1center[0],im2center[1]])
+        blueCoordinates = np.array([im2circle1Pos[0], im1circle1Pos[0], im2circle1Pos[1]])
+        greenCoordinates = np.array([im2circle2Pos[0], im1circle2Pos[0], im2circle2Pos[1]])
+        redCoordinates = np.array([im2circle3Pos[0], im1circle3Pos[0], im2circle3Pos[1]])
 
-        ja4 = np.arctan2(im2circle3Pos[0] - im2circle2Pos[0],
-                            im2circle2Pos[1] - im2circle3Pos[1]) - ja2 - ja3 - im2ja1
-        ja4 = ja4 * -1
+        # Arctan2 takes dy, dx as arguments
 
-        # if (abs(im1ja4 - im1ja4) < 0.5):
-        #     ja4 = (im1ja4 + im2ja4) / 2
-        # else:
-        #     distToIm1 = abs(im1ja4 - self.joint4_angle_prev)
-        #     distToIm2 = abs(im2ja4 - self.joint4_angle_prev)
-        #
-        #     if (distToIm1 <= distToIm2):
-        #         ja4 = distToIm1
-        #     else:
-        #         ja4 = distToIm2
+        # ja1 doesn't rotate so is always 0 but could be calculated like this
+        # ja1 = np.arctan2(yellowCoordinates[2] - blueCoordinates[2],
+        #                  blueCoordinates[1] - yellowCoordinates[1])
+        ja1 = 0
 
-        if (abs(ja2 - self.joint2_angle_prev) > 0.5):
-            ja2 = self.joint2_angle_prev + 1/3 * (ja2 - self.joint2_angle_prev)
+        # ja2 rotates in x
+        print(blueCoordinates[2],greenCoordinates[2],blueCoordinates[1], greenCoordinates[1])
+        ja2 = np.arctan2(blueCoordinates[2] - greenCoordinates[2],
+                         blueCoordinates[1] - greenCoordinates[1]) - ja1
 
-        if (abs(ja3 - self.joint3_angle_prev) > 0.5):
-            ja3 = self.joint3_angle_prev + 1/3 * (ja3 - self.joint3_angle_prev)
+        # ja3 rotates in y
+        ja3 = np.arctan2(greenCoordinates[1] - blueCoordinates[1],
+                         greenCoordinates[0] - blueCoordinates[0]) - ja2 -ja1
 
-        if (abs(ja4 - self.joint4_angle_prev) > 0.2):
-            ja4 = self.joint4_angle_prev + 1 / 3 * (ja4 - self.joint4_angle_prev)
+        # ja4 rotates in x
+        ja4 = np.arctan2(redCoordinates[2] - blueCoordinates[1],
+                         redCoordinates[1] - blueCoordinates[1]) - ja3 - ja2 - ja1
+
+        # ja2 = self.compensate_joint(ja2, self.joint2_angle_prev, 0.1, 0.5)
+        # ja3 = self.compensate_joint(ja3, self.joint3_angle_prev, 0.1, 0.5)
+        # ja4 = self.compensate_joint(ja3, self.joint3_angle_prev, 0.1, 0.5)
 
         self.joint2_angle_prev = ja2
         self.joint3_angle_prev = ja3
         self.joint3_angle_prev = ja4
 
-        return np.array([ja2,ja3,ja4]) #ja2,ja3,ja4
+        return np.array([ja2,ja3,ja4])
+
+    def compensate_joint(self, joint_value, prev_value, increment, threshold):
+        # If the joint angle is a threshold different from the previous angle
+        # returns the value of that joint incremented in the appropiate direction of
+        # movement
+        return_value = joint_value
+        if (abs(joint_value - prev_value) > threshold):
+            if (joint_value > prev_value):
+                return_value = prev_value + 0.1
+            else:
+                return_value = prev_value - 0.1
+        return return_value
 
 # call the class
 def main(args):
