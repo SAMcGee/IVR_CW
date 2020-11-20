@@ -165,7 +165,7 @@ class image_converter:
                          blueCoordinates[0] - greenCoordinates[0])
 
         # ja4 rotates in x (hence we need only minus ja2 from it)
-        ja4 = np.arctan2(redCoordinates[1] - greenCoordinates[1],
+        ja4 = np.arctan2(greenCoordinates[1] - redCoordinates[1],
                          greenCoordinates[2] - redCoordinates[2]) - ja2
 
         ja2 = self.compensate_joint(ja2, self.joint2_angle_prev, 0.1, 1.5)
