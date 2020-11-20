@@ -28,47 +28,45 @@ class image_converter:
         # Additional Code Added
         self.t0 = rospy.get_time()
 
-        self.joint1 = Float64()
         self.joint2 = Float64()
         self.joint3 = Float64()
         self.joint4 = Float64()
 
-        # used to track what the previous estimation of this joint was
-        self.joint2_angle_prev = 0
-        self.joint3_angle_prev = 0
-        self.joint4_angle_prev = 0
+        # used to track what the previous estimation of this joint angle
+        self.joint2_angle_prev = [0,0]
+        self.joint3_angle_prev = [0,0]
+        self.joint4_angle_prev = [0,0]
 
+        # Publishers for joint angles
         self.robot_joint2_pub = rospy.Publisher("/robot/joint2_position_controller/command", Float64, queue_size=10)
         self.robot_joint3_pub = rospy.Publisher("/robot/joint3_position_controller/command", Float64, queue_size=10)
         self.robot_joint4_pub = rospy.Publisher("/robot/joint4_position_controller/command", Float64, queue_size=10)
 
+        # Publishers for estimated joint angles
         self.robot_joint2_angle_estimate_pub = rospy.Publisher("/robot/joint2_angle_est", Float64, queue_size=10)
         self.robot_joint3_angle_estimate_pub = rospy.Publisher("/robot/joint3_angle_est", Float64, queue_size=10)
         self.robot_joint4_angle_estimate_pub = rospy.Publisher("/robot/joint4_angle_est", Float64, queue_size=10)
 
+        # Subscribers to recieve both images
         self.image_sub1 = rospy.Subscriber("/camera1/robot/image_raw", Image, self.callback1)
         self.image_sub2 = rospy.Subscriber("/camera2/robot/image_raw", Image, self.callback2)
 
     def callback1(self, data):
+        # Recieve image1 (from camera one)
         try:
             self.cv_image1 = self.bridge.imgmsg_to_cv2(data, "bgr8")
         except CvBridgeError as e:
             print(e)
 
         cv2.waitKey(1)
-        # cv2.imwrite('image_1.png', self.cv_image1)
-        # j3 = cv2.imshow('window1', self.cv_image1)
 
-    # Receive data, process it, and publish
     def callback2(self, data):
-        # Receive the image
+        # Receive image2 (from camera two)
         try:
             self.cv_image2 = self.bridge.imgmsg_to_cv2(data, "bgr8")
         except CvBridgeError as e:
             print(e)
 
-        # cv2.imwrite('image_2.png', self.cv_image2)
-        # j2 = cv2.imshow('window2', self.cv_image2)
         cv2.waitKey(1)
 
         self.move_robot()
@@ -89,8 +87,7 @@ class image_converter:
     def move_robot(self):
         cur_time = np.array([rospy.get_time()]) - self.t0
 
-        self.joint1.data = 0  # Joint 1 is fixed
-        self.joint2.data = (np.pi / 2) * np.sin(cur_time *np.pi / 15)
+        self.joint2.data = (np.pi / 2) * np.sin(cur_time * np.pi / 15)
         self.joint3.data = (np.pi / 2) * np.sin(cur_time * np.pi / 18)
         self.joint4.data = (np.pi / 2) * np.sin(cur_time * np.pi / 20)
 
@@ -115,6 +112,12 @@ class image_converter:
         kernel = np.ones((5, 5), np.uint8)
         mask = cv2.dilate(mask, kernel, iterations=3)
         moments = cv2.moments(mask)
+
+        # In the case no blob can be found, returns a value outside the range
+        # so the compensate_joint function will produce estimated values
+        # until the joint is visible again
+        if moments['m00'] == 0:
+            return np.array([5,5])
 
         cx = int(moments['m10'] / moments['m00'])
         cy = int(moments['m01'] / moments['m00'])
@@ -153,46 +156,53 @@ class image_converter:
         greenCoordinates = np.array([im2circle2Pos[0], im1circle2Pos[0], im2circle2Pos[1]])
         redCoordinates = np.array([im2circle3Pos[0], im1circle3Pos[0], im2circle3Pos[1]])
 
-        # Arctan2 takes dy, dx as arguments
+        # ja2 rotates in x (ja1 doesn't rotate)
+        ja2 = np.arctan2(blueCoordinates[1] - greenCoordinates[1],
+                         blueCoordinates[2] - greenCoordinates[2])
 
-        # ja1 doesn't rotate so is always 0 but could be calculated like this
-        # ja1 = np.arctan2(yellowCoordinates[2] - blueCoordinates[2],
-        #                  blueCoordinates[1] - yellowCoordinates[1])
-        ja1 = 0
+        # ja3 rotates in y (no other joints rotate in y)
+        ja3 = np.arctan2(blueCoordinates[1] - greenCoordinates[1],
+                         blueCoordinates[0] - greenCoordinates[0])
 
-        # ja2 rotates in x
-        print(blueCoordinates[2],greenCoordinates[2],blueCoordinates[1], greenCoordinates[1])
-        ja2 = np.arctan2(blueCoordinates[2] - greenCoordinates[2],
-                         blueCoordinates[1] - greenCoordinates[1]) - ja1
+        # ja4 rotates in x (hence we need only minus ja2 from it)
+        ja4 = np.arctan2(redCoordinates[1] - greenCoordinates[1],
+                         greenCoordinates[2] - redCoordinates[2]) - ja2
 
-        # ja3 rotates in y
-        ja3 = np.arctan2(greenCoordinates[1] - blueCoordinates[1],
-                         greenCoordinates[0] - blueCoordinates[0]) - ja2 -ja1
+        ja2 = self.compensate_joint(ja2, self.joint2_angle_prev, 0.1, 1.5)
+        ja3 = self.compensate_joint(ja3, self.joint3_angle_prev, 0.1, 1.5)
+        ja4 = self.compensate_joint(ja4, self.joint4_angle_prev, 0.1, 1.5)
 
-        # ja4 rotates in x
-        ja4 = np.arctan2(redCoordinates[2] - blueCoordinates[1],
-                         redCoordinates[1] - blueCoordinates[1]) - ja3 - ja2 - ja1
-
-        # ja2 = self.compensate_joint(ja2, self.joint2_angle_prev, 0.1, 0.5)
-        # ja3 = self.compensate_joint(ja3, self.joint3_angle_prev, 0.1, 0.5)
-        # ja4 = self.compensate_joint(ja3, self.joint3_angle_prev, 0.1, 0.5)
-
-        self.joint2_angle_prev = ja2
-        self.joint3_angle_prev = ja3
-        self.joint3_angle_prev = ja4
+        self.joint2_angle_prev = [self.joint2_angle_prev[1], ja2]
+        self.joint3_angle_prev = [self.joint3_angle_prev[1], ja3]
+        self.joint4_angle_prev = [self.joint4_angle_prev[1], ja4]
 
         return np.array([ja2,ja3,ja4])
 
     def compensate_joint(self, joint_value, prev_value, increment, threshold):
         # If the joint angle is a threshold different from the previous angle
         # returns the value of that joint incremented in the appropiate direction of
-        # movement
+        # movement. pi/2 and -pi/2 are the maximum and minimum values of the joints
         return_value = joint_value
-        if (abs(joint_value - prev_value) > threshold):
-            if (joint_value > prev_value):
-                return_value = prev_value + 0.1
-            else:
-                return_value = prev_value - 0.1
+
+        if (abs(joint_value - prev_value[1]) > threshold):
+
+            if prev_value[0] < prev_value[1]:
+
+                if prev_value[1] + increment < np.pi/2:
+                    return_value = prev_value[1] + increment
+                else:
+                    return_value = prev_value[1] - increment
+
+            elif prev_value[0] > prev_value[1]:
+
+                if prev_value[1] - increment > -1 * np.pi/2:
+                    return_value = prev_value[1] - increment
+                else:
+                    return_value = prev_value[1] + increment
+
+            elif prev_value[0] == prev_value[1] or prev_value[1] == joint_value or prev_value[0] == joint_value:
+                # Incentivies going toward actual estimate if relying on this function to calculate angles
+                return_value = 0.2 * joint_value
         return return_value
 
 # call the class
