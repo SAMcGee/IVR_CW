@@ -184,6 +184,12 @@ class image_converter:
         # movement. pi/2 and -pi/2 are the maximum and minimum values of the joints
         return_value = joint_value
 
+        if (joint_value > np.pi/2):
+            return prev_value[1] - increment
+
+        if (joint_value < -1 * np.pi/2):
+            return prev_value[1] + increment
+
         if (abs(joint_value - prev_value[1]) > threshold):
 
             if prev_value[0] < prev_value[1]:
