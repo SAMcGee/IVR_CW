@@ -10,6 +10,7 @@ from sensor_msgs.msg import Image, JointState
 from std_msgs.msg import Float64MultiArray, Float64
 from cv_bridge import CvBridge, CvBridgeError
 from math import sin, cos
+from matplotlib import pyplot as plt
 
 class image_converter:
 
@@ -41,7 +42,13 @@ class image_converter:
     self.robot_joint1_pub = rospy.Publisher("/robot/joint1_position_controller/command", Float64, queue_size=10)
     self.robot_joint2_pub = rospy.Publisher("/robot/joint2_position_controller/command", Float64, queue_size=10) 
     self.robot_joint3_pub = rospy.Publisher("/robot/joint3_position_controller/command", Float64, queue_size=10) 
-    self.robot_joint4_pub = rospy.Publisher("/robot/joint4_position_controller/command", Float64, queue_size=10)  
+    self.robot_joint4_pub = rospy.Publisher("/robot/joint4_position_controller/command", Float64, queue_size=10)
+    
+    self.figx, self.axx = plt.subplots()
+    self.figy, self.axy = plt.subplots() 
+    self.figz, self.axz = plt.subplots()  
+     
+    
 
 
   # Recieve data from camera 1, process it, and publish
@@ -59,30 +66,32 @@ class image_converter:
     im2=cv2.imshow('window2',self.cv_image2)
     cv2.waitKey(1)
     print('FK vs Image')
-    end_effector = self.forward_kinematics()
-    print(end_effector)
+    fk_end_effector = self.forward_kinematics()
+    print(fk_end_effector)
     image_end_effector = self.calculate_end_effector_coords(self.cv_image1,self.cv_image2)
     print(image_end_effector)
+    target_position = self.calculate_target_position()
+    self.plot_positions(fk_end_effector, target_position)
     
-    #q_d = self.control_closed(self.cv_image1, self.cv_image2)
-    #self.joint1=Float64()
-    #self.joint1.data = q_d[0]
-    #self.joint2=Float64()
-    #self.joint2.data = q_d[1]
-    #self.joint3=Float64()
-    #self.joint3.data = q_d[2]
-    #self.joint4=Float64()
-    #self.joint4.data = q_d[3]
+    q_d = self.control_closed(self.cv_image1, self.cv_image2)
+    self.joint1=Float64()
+    self.joint1.data = q_d[0]
+    self.joint2=Float64()
+    self.joint2.data = q_d[1]
+    self.joint3=Float64()
+    self.joint3.data = q_d[2]
+    self.joint4=Float64()
+    self.joint4.data = q_d[3]
     
     
     
     # Publish the results
     try: 
       self.image_pub1.publish(self.bridge.cv2_to_imgmsg(self.cv_image1, "bgr8"))
-      #self.robot_joint1_pub.publish(self.joint1)
-      #self.robot_joint2_pub.publish(self.joint2)
-      #self.robot_joint3_pub.publish(self.joint3)
-      #self.robot_joint4_pub.publish(self.joint4)
+      self.robot_joint1_pub.publish(self.joint1)
+      self.robot_joint2_pub.publish(self.joint2)
+      self.robot_joint3_pub.publish(self.joint3)
+      self.robot_joint4_pub.publish(self.joint4)
     except CvBridgeError as e:
       print(e)
       
@@ -100,6 +109,31 @@ class image_converter:
     self.actual_joint2.data = data.position[1]
     self.actual_joint3.data = data.position[2]
     self.actual_joint4.data = data.position[3]
+    
+  def plot_positions(self, end_effector, target):
+    time = rospy.get_time()
+    figx, axx = self.figx,self.axx
+    axx.plot(time,end_effector[0], '.', c='b')
+    axx.plot(time,target[0],'.', c='orange')
+    axx.set(xlim=([time - 10, time]))
+    figx.canvas.draw()
+    figx.savefig('plotx.png')
+    
+    figy, axy = self.figy,self.axy
+    axy.plot(time,end_effector[1], '.', c='g')
+    axy.plot(time,target[1],'.', c='orange')
+    axy.set(xlim=([time - 10, time]))
+    figy.canvas.draw()
+    figy.savefig('ploty.png')
+    
+    figz, axz = self.figz, self.axz
+    axz.plot(time,end_effector[2], '.', c='y')
+    axz.plot(time,target[2],'.', c='orange')
+    axz.set(xlim=([time - 10, time]))
+    figz.canvas.draw()
+    figz.savefig('plotz.png')
+    plt.pause(0.0000000001)
+  
   
   def forward_kinematics(self):
     theta_1 = -self.actual_joint1.data
