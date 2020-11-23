@@ -31,6 +31,11 @@ class image_converter:
     self.actual_joint3 = Float64()
     self.actual_joint4 = Float64()
     
+    self.previous_joint1 = Float64()
+    self.previous_joint2 = Float64()
+    self.previous_joint3 = Float64()
+    self.previous_joint4 = Float64()
+    
     self.time_previous_step = np.array([rospy.get_time()],dtype='float64')
     
     self.error = np.array([0.0,0.0,0.0], dtype='float64')
@@ -44,10 +49,15 @@ class image_converter:
     self.robot_joint3_pub = rospy.Publisher("/robot/joint3_position_controller/command", Float64, queue_size=10) 
     self.robot_joint4_pub = rospy.Publisher("/robot/joint4_position_controller/command", Float64, queue_size=10)
     
-    self.figx, self.axx = plt.subplots()
-    self.figy, self.axy = plt.subplots() 
-    self.figz, self.axz = plt.subplots()  
-     
+    self.fk_x_pub = rospy.Publisher('fk_x', Float64, queue_size=10)
+    self.fk_y_pub = rospy.Publisher('fk_y', Float64, queue_size=10)
+    self.fk_z_pub = rospy.Publisher('fk_z', Float64, queue_size=10)
+    
+    self.target_x_sub = rospy.Subscriber('/target_x', Float64, self.target_x_callback)
+    self.target_y_sub = rospy.Subscriber('/target_y', Float64, self.target_y_callback)
+    self.target_z_sub = rospy.Subscriber('/target_z', Float64, self.target_z_callback)
+    
+    self.end_effector_estimation = Float64MultiArray()
     
 
 
@@ -68,10 +78,22 @@ class image_converter:
     print('FK vs Image')
     fk_end_effector = self.forward_kinematics()
     print(fk_end_effector)
+    
+    self.fk_x = Float64()
+    self.fk_x.data = fk_end_effector[0]
+    self.fk_y = Float64()
+    self.fk_y.data = fk_end_effector[1]
+    self.fk_z = Float64()
+    self.fk_z.data = fk_end_effector[2]
+    
+    
     image_end_effector = self.calculate_end_effector_coords(self.cv_image1,self.cv_image2)
     print(image_end_effector)
-    target_position = self.calculate_target_position()
-    self.plot_positions(fk_end_effector, target_position)
+    
+    self.target_x = Float64()    
+    self.target_y = Float64()    
+    self.target_z = Float64()
+    
     
     q_d = self.control_closed(self.cv_image1, self.cv_image2)
     self.joint1=Float64()
@@ -83,7 +105,7 @@ class image_converter:
     self.joint4=Float64()
     self.joint4.data = q_d[3]
     
-    
+    self.end_effector_estimation = fk_end_effector
     
     # Publish the results
     try: 
@@ -92,6 +114,12 @@ class image_converter:
       self.robot_joint2_pub.publish(self.joint2)
       self.robot_joint3_pub.publish(self.joint3)
       self.robot_joint4_pub.publish(self.joint4)
+      self.fk_x_pub.publish(self.fk_x)
+      self.fk_y_pub.publish(self.fk_y)
+      self.fk_z_pub.publish(self.fk_z)
+      #self.target_x_pub.publish(self.target_x)
+      #self.target_y_pub.publish(self.target_y)
+      #self.target_z_pub.publish(self.target_z)
     except CvBridgeError as e:
       print(e)
       
@@ -105,35 +133,26 @@ class image_converter:
 
   
   def joint_callback(self, data):
+    self.previous_joint1.data = actual_joint1.data
+    self.previous_joint2.data = actual_joint2.data
+    self.previous_joint3.data = actual_joint3.data
+    self.previous_joint4.data = actual_joint4.data
     self.actual_joint1.data = data.position[0]
     self.actual_joint2.data = data.position[1]
     self.actual_joint3.data = data.position[2]
     self.actual_joint4.data = data.position[3]
     
-  def plot_positions(self, end_effector, target):
-    time = rospy.get_time()
-    figx, axx = self.figx,self.axx
-    axx.plot(time,end_effector[0], '.', c='b')
-    axx.plot(time,target[0],'.', c='orange')
-    axx.set(xlim=([time - 10, time]))
-    figx.canvas.draw()
-    figx.savefig('plotx.png')
+  def target_x_callback(self, data):
+    self.target_x.data = data  
     
-    figy, axy = self.figy,self.axy
-    axy.plot(time,end_effector[1], '.', c='g')
-    axy.plot(time,target[1],'.', c='orange')
-    axy.set(xlim=([time - 10, time]))
-    figy.canvas.draw()
-    figy.savefig('ploty.png')
+  def target_y_callback(self, data):
+    self.target_y.data = data  
     
-    figz, axz = self.figz, self.axz
-    axz.plot(time,end_effector[2], '.', c='y')
-    axz.plot(time,target[2],'.', c='orange')
-    axz.set(xlim=([time - 10, time]))
-    figz.canvas.draw()
-    figz.savefig('plotz.png')
-    plt.pause(0.0000000001)
-  
+  def target_z_callback(self, data):
+    self.target_z.data = data
+    
+    
+   
   
   def forward_kinematics(self):
     theta_1 = -self.actual_joint1.data
@@ -164,8 +183,6 @@ class image_converter:
     return jacobian
 
 
-  def calculate_target_position(self):
-    return np.array([4,2,5])
     
   def control_closed(self,image1,image2):
     K_p = np.array([[10,0,0],[0,10,0],[0,0,10]])
@@ -188,11 +205,39 @@ class image_converter:
     
     J_inv = np.linalg.pinv(self.calculate_jacobian())
     dq_d = np.dot(J_inv, (np.dot(K_d, self.error_d.transpose()) + np.dot(K_p, self.error.transpose())))
-    print(q.dtype)
-    print(dt.dtype)
-    print(dq_d.dtype)
     q_d = q + (dt * dq_d)
     return q_d
+    
+  def null_space(self):
+    K_p = np.array([[10,0,0],[0,10,0],[0,0,10]])
+    
+    K_d = np.array([[0.1,0,0],[0,0.1,0],[0,0,0.1]])
+    
+    cur_time = np.array([rospy.get_time()])
+    dt = cur_time - self.time_previous_step
+    self.time_previous_step = cur_time
+    square_pos = np.array([5.0,4.0,3.0])
+    prev_pos = self.end_effector_estimation
+    pos = self.forward_kinematics()
+    
+    pos_d = self.calculate_target_position()
+    
+    self.error_d = ((pos_d - pos) - self.error)/dt
+    
+    self.error = pos_d-pos
+    
+    wprev = np.linalg.norm(prev_pos - square_pos)
+    w = np.linalg.norm(pos - square_pos)
+    w_diff = w - wprev
+    
+    dq0 = np.array([(w_diff/q_diff[0]), w_diff/q_diff[1], w_diff/q_diff[2]])
+    
+    q = np.array([self.actual_joint1.data, self.actual_joint2.data, self.actual_joint3.data, self.actual_joint4.data])
+    
+    J_inv = np.linalg.pinv(self.calculate_jacobian())
+    dq_d = np.dot(J_inv, (np.dot(K_d, self.error_d.transpose()) + np.dot(K_p, self.error.transpose()))) + np.dot((np.eye(3,3) - np.dot(J_inv,J)),dq0)
+    q_d = q + (dt * dq_d)
+  
     
   def detect_color(self, image, color):
     if color == "blue":
