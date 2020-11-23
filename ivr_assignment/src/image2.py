@@ -73,6 +73,9 @@ class image_converter:
         self.joints = Float64MultiArray
         self.joints.data = self.detect_joint_angles(self.cv_image1, self.cv_image2)
 
+        im1 = cv2.imshow('cam1', self.cv_image1)
+        im2 = cv2.imshow('cam2', self.cv_image2)
+
         # Publish the results
         try:
             self.image_pub2.publish(self.bridge.cv2_to_imgmsg(self.cv_image2, "bgr8"))
@@ -87,9 +90,9 @@ class image_converter:
     def move_robot(self):
         cur_time = np.array([rospy.get_time()]) - self.t0
 
-        self.joint2.data = (np.pi / 2) * np.sin(cur_time * np.pi / 15)
-        self.joint3.data = (np.pi / 2) * np.sin(cur_time * np.pi / 18)
-        self.joint4.data = (np.pi / 2) * np.sin(cur_time * np.pi / 20)
+        self.joint2.data = 0 # (np.pi / 2) * np.sin(cur_time * np.pi / 15)
+        self.joint3.data = 1 # (np.pi / 2) * np.sin(cur_time * np.pi / 18)
+        self.joint4.data = 0 # (np.pi / 2) * np.sin(cur_time * np.pi / 20)
 
         self.robot_joint2_pub.publish(self.joint2)
         self.robot_joint3_pub.publish(self.joint3)
@@ -135,46 +138,51 @@ class image_converter:
         a = self.pixel2meter(image1) # Will be the same in second image because it doesn't move
 
         # Centre-points of each blob calculated using the first image
-        im1center = a * self.detect_color(image1, "yellow")
-        im1circle1Pos = a * self.detect_color(image1, "blue")
-        im1circle2Pos = a * self.detect_color(image1, "green")
-        im1circle3Pos = a * self.detect_color(image1, "red")
+        im1_yellow = a * self.detect_color(image1, "yellow")
+        im1_blue = a * self.detect_color(image1, "blue")
+        im1_green = a * self.detect_color(image1, "green")
+        im1_red = a * self.detect_color(image1, "red")
 
         # Centre-points of each blob calculated using the second image
-        im2center = a * self.detect_color(image2, "yellow")
-        im2circle1Pos = a * self.detect_color(image2, "blue")
-        im2circle2Pos = a * self.detect_color(image2, "green")
-        im2circle3Pos = a * self.detect_color(image2, "red")
+        im2_yellow = a * self.detect_color(image2, "yellow")
+        im2_blue = a * self.detect_color(image2, "blue")
+        im2_green = a * self.detect_color(image2, "green")
+        im2_red = a * self.detect_color(image2, "red")
 
         # Camera 1 gives us (y,z)
         # Camera 2 gives us (x,z)
         # So z should be the same across either, we derive the x,y,z positions as follows
         # There are small differences in z between them but it won't effect calculations
 
-        yellowCoordinates = np.array([im2center[0],im1center[0],im2center[1]])
-        blueCoordinates = np.array([im2circle1Pos[0], im1circle1Pos[0], im2circle1Pos[1]])
-        greenCoordinates = np.array([im2circle2Pos[0], im1circle2Pos[0], im2circle2Pos[1]])
-        redCoordinates = np.array([im2circle3Pos[0], im1circle3Pos[0], im2circle3Pos[1]])
+        yellowCoordinates = np.array([im2_yellow[0],im1_yellow[0],im2_yellow[1]])
+        blueCoordinates = np.array([im2_blue[0], im1_blue[0], im2_blue[1]])
+        greenCoordinates = np.array([im2_green[0], im1_green[0], im2_green[1]])
+        redCoordinates = np.array([im2_red[0], im1_red[0], im2_red[1]])
 
         # ja2 rotates in x (ja1 doesn't rotate)
-        ja2 = np.arctan2(blueCoordinates[1] - greenCoordinates[1],
-                         blueCoordinates[2] - greenCoordinates[2])
+        ja2 = np.arctan2(greenCoordinates[1] - blueCoordinates[1],
+                         blueCoordinates[2] - greenCoordinates[2],
+                         )
 
         # ja3 rotates in y (no other joints rotate in y)
-        ja3 = np.arctan2(blueCoordinates[1] - greenCoordinates[1],
-                         blueCoordinates[0] - greenCoordinates[0])
+        ja3 = np.arctan2(blueCoordinates[0] - greenCoordinates[0],
+                         im2_blue[1] - im2_green[1])
+        print(blueCoordinates[2] - greenCoordinates[2])
+        print(im2_blue[1] - im2_green[1])
+        # ja3 = np.arctan2(blueCoordinates[0] - greenCoordinates[0],
+        #                  blueCoordinates[2] - greenCoordinates[2])
 
         # ja4 rotates in x (hence we need only minus ja2 from it)
-        ja4 = np.arctan2(greenCoordinates[1] - redCoordinates[1],
+        ja4 = np.arctan2(redCoordinates[1] - greenCoordinates[1],
                          greenCoordinates[2] - redCoordinates[2]) - ja2
 
-        ja2 = self.compensate_joint(ja2, self.joint2_angle_prev, 0.1, 1.5)
-        ja3 = self.compensate_joint(ja3, self.joint3_angle_prev, 0.1, 1.5)
-        ja4 = self.compensate_joint(ja4, self.joint4_angle_prev, 0.1, 1.5)
-
-        self.joint2_angle_prev = [self.joint2_angle_prev[1], ja2]
-        self.joint3_angle_prev = [self.joint3_angle_prev[1], ja3]
-        self.joint4_angle_prev = [self.joint4_angle_prev[1], ja4]
+        # ja2 = self.compensate_joint(ja2, self.joint2_angle_prev, 0.1, 1.5)
+        # ja3 = self.compensate_joint(ja3, self.joint3_angle_prev, 0.1, 1.5)
+        # ja4 = self.compensate_joint(ja4, self.joint4_angle_prev, 0.1, 1.5)
+        #
+        # self.joint2_angle_prev = [self.joint2_angle_prev[1], ja2]
+        # self.joint3_angle_prev = [self.joint3_angle_prev[1], ja3]
+        # self.joint4_angle_prev = [self.joint4_angle_prev[1], ja4]
 
         return np.array([ja2,ja3,ja4])
 
