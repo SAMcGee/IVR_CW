@@ -34,9 +34,9 @@ class image_converter:
 
         self.t0 = rospy.get_time()
 
-        self.prev_x = 0
-        self.prev_y = 0
-        self.prev_z = 0
+        self.prev_x = [0,0]
+        self.prev_y = [0,0]
+        self.prev_z = [0,0]
 
         self.init_flag = True
 
@@ -62,34 +62,76 @@ class image_converter:
         self.target_pub_y.publish(coords[1])
         self.target_pub_z.publish(coords[2])
 
+    def detect_color(self, image, color):
+        if color == "blue":
+            mask = cv2.inRange(image, (100, 0, 0), (255, 0, 0))
+        elif color == "yellow":
+            mask = cv2.inRange(image, (0, 100, 100), (0, 255, 255))
+        else:
+            raise Exception("Attempting to detect undefined color")
+
+        kernel = np.ones((5, 5), np.uint8)
+        mask = cv2.dilate(mask, kernel, iterations=3)
+        moments = cv2.moments(mask)
+
+        cx = int(moments['m10'] / moments['m00'])
+        cy = int(moments['m01'] / moments['m00'])
+
+        return np.array([cx, cy])
+
+    def pixel2meter(self, image):
+        circle1Pos = self.detect_color(image, "yellow")
+        circle2Pos = self.detect_color(image, "blue")
+        dist = np.sum((circle1Pos - circle2Pos) ** 2)
+        # 2.5 is the length of the first link (between yellow and blue)
+        return 2.5 / np.sqrt(dist)
+
     def get_circle_coords(self):
+        # would be equvialent over both images so use image1
+        a = self.pixel2meter(self.cv_image1)
 
         # Camera 1 gives us (y,z) of the orange sphere
         # Camera 2 gives us (x,z) of the orange sphere
         im1center = self.detect_orange(self.cv_image1)
         im2center = self.detect_orange(self.cv_image2)
 
-        if not self.init_flag:
-            return_x = self.adjust_for_going_oob(im2center[0], 50, 'x')
-            return_y = self.adjust_for_going_oob(im1center[0], 30, 'y')
-            return_z = self.adjust_for_going_oob(im2center[1], 50, 'z')
+        # TODO: Implement something to smooth this
+        if False: #not self.init_flag:
+            return_x = self.adjust_for_going_oob(im2center[0], 35, 'x')
+            return_y = self.adjust_for_going_oob(im1center[0], 35, 'y')
+            return_z = self.adjust_for_going_oob(im2center[1], 35, 'z')
         else:
-            return_x = int(im2center[0])
-            return_y = int(im1center[0])
-            return_z = int(im2center[1])
+            return_x = (im2center[0])
+            return_y = (im1center[0])
+            return_z = (im2center[1])
+
+            self.prev_x = [return_x, return_x]
+            self.prev_y = [return_y, return_y]
+            self.prev_z = [return_z, return_z]
             self.init_flag = False
 
-        self.prev_x = return_x
-        self.prev_y = return_y
-        self.prev_z = return_z
+        self.prev_x = [self.prev_x[1], return_x]
+        self.prev_y = [self.prev_y[1], return_y]
+        self.prev_z = [self.prev_z[1], return_z]
 
-        # cv2.circle(self.cv_image1, (return_y, return_z), 3, 255, 2)
+        # Displays on overall image where the position is detected
+        # cv2.circle(self.cv_image1, (int(return_y), int(return_z)), 3, 255, 2)
         # cv2.imshow('cam1', self.cv_image1)
         #
         # cv2.circle(self.cv_image2, (int(return_x), int(return_z)), 3, 255, 2)
         # cv2.imshow('cam2', self.cv_image2)
 
-        return(np.array([return_x, return_y, return_z]))
+        # Gets coordinates scaled
+        im1_yellow = a * self.detect_color(self.cv_image1, "yellow")
+        im2_yellow = a * self.detect_color(self.cv_image2, "yellow")
+        yellow_coordinates = np.array([im2_yellow[0], im1_yellow[0], im2_yellow[1]])
+
+        # Scales x,y,z coordinates and substracts the coordinates of yellow to get the relative position
+        return_array = np.array([return_x, return_y, return_z])
+        return_array = a * return_array
+        return_array = yellow_coordinates - return_array
+
+        return return_array
 
     # Adjusts for the sphere going out of bounds by comparing to previous location
     def adjust_for_going_oob(self, cur, threshold, dimension):
@@ -102,10 +144,15 @@ class image_converter:
         else:
             Exception('Dimension' + str(dimension) + ' is invalid')
 
-        if abs(cur - prev) > threshold:
-            return prev
-        else:
-            return cur
+        return_value = cur
+
+        if (abs(cur - prev[1]) > threshold):
+            if prev[0] < prev[1]:
+                return_value = prev[1] + (prev[1] - prev[0])
+            elif prev[0] >= prev[1]:
+                return_value = prev[1] - (prev[0] - prev[1])
+        
+        return return_value
 
     # Detect and show orange
     def detect_orange(self, image):
