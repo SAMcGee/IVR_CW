@@ -58,6 +58,9 @@ class image_converter:
     self.target_z_sub = rospy.Subscriber('/target_z', Float64, self.target_z_callback)
     
     self.end_effector_estimation = Float64MultiArray()
+    self.target_x = Float64()    
+    self.target_y = Float64()    
+    self.target_z = Float64()
     
 
 
@@ -73,11 +76,15 @@ class image_converter:
     #cv2.imwrite('image_copy.png', cv_image)
 
     im1=cv2.imshow('window1', self.cv_image1)
-    im2=cv2.imshow('window2',self.cv_image2)
+    #im2=cv2.imshow('window2',self.cv_image2)
     cv2.waitKey(1)
     print('FK vs Image')
     fk_end_effector = self.forward_kinematics()
     print(fk_end_effector)
+    print(self.actual_joint1)
+    print(self.actual_joint2)
+    print(self.actual_joint3)
+    print(self.actual_joint4)
     
     self.fk_x = Float64()
     self.fk_x.data = fk_end_effector[0]
@@ -90,12 +97,10 @@ class image_converter:
     image_end_effector = self.calculate_end_effector_coords(self.cv_image1,self.cv_image2)
     print(image_end_effector)
     
-    self.target_x = Float64()    
-    self.target_y = Float64()    
-    self.target_z = Float64()
     
     
     q_d = self.control_closed(self.cv_image1, self.cv_image2)
+    #q_d = [1.2,-1.0,-0.2,1.0]
     self.joint1=Float64()
     self.joint1.data = q_d[0]
     self.joint2=Float64()
@@ -133,69 +138,61 @@ class image_converter:
 
   
   def joint_callback(self, data):
-    self.previous_joint1.data = actual_joint1.data
-    self.previous_joint2.data = actual_joint2.data
-    self.previous_joint3.data = actual_joint3.data
-    self.previous_joint4.data = actual_joint4.data
+    self.previous_joint1.data = self.actual_joint1.data
+    self.previous_joint2.data = self.actual_joint2.data
+    self.previous_joint3.data = self.actual_joint3.data
+    self.previous_joint4.data = self.actual_joint4.data
     self.actual_joint1.data = data.position[0]
     self.actual_joint2.data = data.position[1]
     self.actual_joint3.data = data.position[2]
     self.actual_joint4.data = data.position[3]
     
   def target_x_callback(self, data):
-    self.target_x.data = data  
+    self.target_x = data  
     
   def target_y_callback(self, data):
-    self.target_y.data = data  
+    self.target_y = data  
     
   def target_z_callback(self, data):
-    self.target_z.data = data
+    self.target_z = data
     
     
    
   
   def forward_kinematics(self):
-    theta_1 = -self.actual_joint1.data
-    theta_2 = self.actual_joint2.data
+    theta_1 = np.pi/2+self.actual_joint1.data
+    theta_2 = -np.pi/2-self.actual_joint2.data
     theta_3 = self.actual_joint3.data
     theta_4 = self.actual_joint4.data
-    alpha_1 = 3*np.pi/2
-    alpha_2 = 3*np.pi/2
-    alpha_3 = np.pi/2
-    pi = np.pi
-    end_effector = np.array([3*((-sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_1) + cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*cos(theta_3) - (sin(alpha_1)*sin(alpha_2)*sin(3*pi/2 - theta_1) - sin(3*pi/2 - theta_1)*cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 + theta_2) - sin(3*pi/2 + theta_2)*cos(alpha_2)*cos(3*pi/2 - theta_1))*sin(theta_3))*cos(theta_4) + 3.5*(-sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_1) + cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*cos(theta_3) + 3*((-sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_1) + cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*sin(theta_3)*cos(alpha_3) + (sin(alpha_1)*sin(alpha_2)*sin(3*pi/2 - theta_1) - sin(3*pi/2 - theta_1)*cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 + theta_2) - sin(3*pi/2 + theta_2)*cos(alpha_2)*cos(3*pi/2 - theta_1))*cos(alpha_3)*cos(theta_3) + (sin(alpha_1)*sin(3*pi/2 - theta_1)*cos(alpha_2) + sin(alpha_2)*sin(3*pi/2 - theta_1)*cos(alpha_1)*cos(3*pi/2 + theta_2) + sin(alpha_2)*sin(3*pi/2 + theta_2)*cos(3*pi/2 - theta_1))*sin(alpha_3))*sin(theta_4) - 3.5*(sin(alpha_1)*sin(alpha_2)*sin(3*pi/2 - theta_1) - sin(3*pi/2 - theta_1)*cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 + theta_2) - sin(3*pi/2 + theta_2)*cos(alpha_2)*cos(3*pi/2 - theta_1))*sin(theta_3),3*((sin(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2) + sin(3*pi/2 + theta_2)*cos(alpha_1)*cos(3*pi/2 - theta_1))*cos(theta_3) - (-sin(alpha_1)*sin(alpha_2)*cos(3*pi/2 - theta_1) - sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_2) + cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*sin(theta_3))*cos(theta_4) + 3.5*(sin(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2) + sin(3*pi/2 + theta_2)*cos(alpha_1)*cos(3*pi/2 - theta_1))*cos(theta_3) + 3*((sin(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2) + sin(3*pi/2 + theta_2)*cos(alpha_1)*cos(3*pi/2 - theta_1))*sin(theta_3)*cos(alpha_3) + (-sin(alpha_1)*sin(alpha_2)*cos(3*pi/2 - theta_1) - sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_2) + cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*cos(alpha_3)*cos(theta_3) + (-sin(alpha_1)*cos(alpha_2)*cos(3*pi/2 - theta_1) + sin(alpha_2)*sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2) - sin(alpha_2)*cos(alpha_1)*cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*sin(alpha_3))*sin(theta_4) - 3.5*(-sin(alpha_1)*sin(alpha_2)*cos(3*pi/2 - theta_1) - sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_2) + cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*sin(theta_3), 3*(-(sin(alpha_1)*cos(alpha_2)*cos(3*pi/2 + theta_2) + sin(alpha_2)*cos(alpha_1))*sin(theta_3) + sin(alpha_1)*sin(3*pi/2 + theta_2)*cos(theta_3))*cos(theta_4) - 3.5*(sin(alpha_1)*cos(alpha_2)*cos(3*pi/2 + theta_2) + sin(alpha_2)*cos(alpha_1))*sin(theta_3) + 3*((-sin(alpha_1)*sin(alpha_2)*cos(3*pi/2 + theta_2) + cos(alpha_1)*cos(alpha_2))*sin(alpha_3) + (sin(alpha_1)*cos(alpha_2)*cos(3*pi/2 + theta_2) + sin(alpha_2)*cos(alpha_1))*cos(alpha_3)*cos(theta_3) + sin(alpha_1)*sin(theta_3)*sin(3*pi/2 + theta_2)*cos(alpha_3))*sin(theta_4) + 3.5*sin(alpha_1)*sin(3*pi/2 + theta_2)*cos(theta_3) + 2.5])
+    end_effector = np.array([3.0*(sin(theta_1)*sin(theta_3) + cos(theta_1)*cos(theta_2)*cos(theta_3))*cos(theta_4) + 3.5*sin(theta_1)*sin(theta_3) + 3.0*sin(theta_2)*sin(theta_4)*cos(theta_1) + 3.5*cos(theta_1)*cos(theta_2)*cos(theta_3), 3.0*(sin(theta_1)*cos(theta_2)*cos(theta_3) - sin(theta_3)*cos(theta_1))*cos(theta_4) + 3.0*sin(theta_1)*sin(theta_2)*sin(theta_4) + 3.5*sin(theta_1)*cos(theta_2)*cos(theta_3) - 3.5*sin(theta_3)*cos(theta_1), -3.0*sin(theta_2)*cos(theta_3)*cos(theta_4) - 3.5*sin(theta_2)*cos(theta_3) + 3.0*sin(theta_4)*cos(theta_2) + 2.5])
     return end_effector
     
   def calculate_jacobian(self):
-    theta_1 = -self.actual_joint1.data
-    theta_2 = self.actual_joint2.data
+    theta_1 = np.pi/2+self.actual_joint1.data
+    theta_2 = -np.pi/2-self.actual_joint2.data
     theta_3 = self.actual_joint3.data
     theta_4 = self.actual_joint4.data
-    alpha_1 = 3*np.pi/2
-    alpha_2 = 3*np.pi/2
-    alpha_3 = np.pi/2
-    pi = np.pi
     
-    jacobian = np.array([[(3*(sin(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2) + sin(3*pi/2 + theta_2)*cos(alpha_1)*cos(3*pi/2 - theta_1))*cos(theta_3) + 3*(sin(alpha_1)*sin(alpha_2)*cos(3*pi/2 - theta_1) + sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_2) - cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*sin(theta_3))*cos(theta_4) + (3.5*sin(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2) + 3.5*sin(3*pi/2 + theta_2)*cos(alpha_1)*cos(3*pi/2 - theta_1))*cos(theta_3) + (3*(sin(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2) + sin(3*pi/2 + theta_2)*cos(alpha_1)*cos(3*pi/2 - theta_1))*sin(theta_3)*cos(alpha_3) + 3*(-sin(alpha_1)*sin(alpha_2)*cos(3*pi/2 - theta_1) - sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_2) + cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*cos(alpha_3)*cos(theta_3) + 3*(-sin(alpha_1)*cos(alpha_2)*cos(3*pi/2 - theta_1) + sin(alpha_2)*sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2) - sin(alpha_2)*cos(alpha_1)*cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*sin(alpha_3))*sin(theta_4) + (3.5*sin(alpha_1)*sin(alpha_2)*cos(3*pi/2 - theta_1) + 3.5*sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_2) - 3.5*cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*sin(theta_3), (3*(-sin(3*pi/2 - theta_1)*cos(alpha_1)*cos(3*pi/2 + theta_2) - sin(3*pi/2 + theta_2)*cos(3*pi/2 - theta_1))*cos(theta_3) + 3*(-sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_1)*cos(alpha_2) + cos(alpha_2)*cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*sin(theta_3))*cos(theta_4) + (-3.5*sin(3*pi/2 - theta_1)*cos(alpha_1)*cos(3*pi/2 + theta_2) - 3.5*sin(3*pi/2 + theta_2)*cos(3*pi/2 - theta_1))*cos(theta_3) + (-3.5*sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_1)*cos(alpha_2) + 3.5*cos(alpha_2)*cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*sin(theta_3) + (3*(-sin(3*pi/2 - theta_1)*cos(alpha_1)*cos(3*pi/2 + theta_2) - sin(3*pi/2 + theta_2)*cos(3*pi/2 - theta_1))*sin(theta_3)*cos(alpha_3) + 3*(-sin(alpha_2)*sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_1) + sin(alpha_2)*cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*sin(alpha_3) + 3*(sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_1)*cos(alpha_2) - cos(alpha_2)*cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*cos(alpha_3)*cos(theta_3))*sin(theta_4), (-3*(-sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_1) + cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*sin(theta_3) + 3*(-sin(alpha_1)*sin(alpha_2)*sin(3*pi/2 - theta_1) + sin(3*pi/2 - theta_1)*cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 + theta_2) + sin(3*pi/2 + theta_2)*cos(alpha_2)*cos(3*pi/2 - theta_1))*cos(theta_3))*cos(theta_4) + (3*(-sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_1) + cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*cos(alpha_3)*cos(theta_3) - 3*(sin(alpha_1)*sin(alpha_2)*sin(3*pi/2 - theta_1) - sin(3*pi/2 - theta_1)*cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 + theta_2) - sin(3*pi/2 + theta_2)*cos(alpha_2)*cos(3*pi/2 - theta_1))*sin(theta_3)*cos(alpha_3))*sin(theta_4) - (-3.5*sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_1) + 3.5*cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*sin(theta_3) + (-3.5*sin(alpha_1)*sin(alpha_2)*sin(3*pi/2 - theta_1) + 3.5*sin(3*pi/2 - theta_1)*cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 + theta_2) + 3.5*sin(3*pi/2 + theta_2)*cos(alpha_2)*cos(3*pi/2 - theta_1))*cos(theta_3), -(3*(-sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_1) + cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*cos(theta_3) - 3*(sin(alpha_1)*sin(alpha_2)*sin(3*pi/2 - theta_1) - sin(3*pi/2 - theta_1)*cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 + theta_2) - sin(3*pi/2 + theta_2)*cos(alpha_2)*cos(3*pi/2 - theta_1))*sin(theta_3))*sin(theta_4) + (3*(-sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_1) + cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*sin(theta_3)*cos(alpha_3) + 3*(sin(alpha_1)*sin(alpha_2)*sin(3*pi/2 - theta_1) - sin(3*pi/2 - theta_1)*cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 + theta_2) - sin(3*pi/2 + theta_2)*cos(alpha_2)*cos(3*pi/2 - theta_1))*cos(alpha_3)*cos(theta_3) + 3*(sin(alpha_1)*sin(3*pi/2 - theta_1)*cos(alpha_2) + sin(alpha_2)*sin(3*pi/2 - theta_1)*cos(alpha_1)*cos(3*pi/2 + theta_2) + sin(alpha_2)*sin(3*pi/2 + theta_2)*cos(3*pi/2 - theta_1))*sin(alpha_3))*cos(theta_4)]
-, [(3*(sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_1) - cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*cos(theta_3) + 3*(sin(alpha_1)*sin(alpha_2)*sin(3*pi/2 - theta_1) - sin(3*pi/2 - theta_1)*cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 + theta_2) - sin(3*pi/2 + theta_2)*cos(alpha_2)*cos(3*pi/2 - theta_1))*sin(theta_3))*cos(theta_4) + (3.5*sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_1) - 3.5*cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*cos(theta_3) + (3*(sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_1) - cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*sin(theta_3)*cos(alpha_3) + 3*(-sin(alpha_1)*sin(alpha_2)*sin(3*pi/2 - theta_1) + sin(3*pi/2 - theta_1)*cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 + theta_2) + sin(3*pi/2 + theta_2)*cos(alpha_2)*cos(3*pi/2 - theta_1))*cos(alpha_3)*cos(theta_3) + 3*(-sin(alpha_1)*sin(3*pi/2 - theta_1)*cos(alpha_2) - sin(alpha_2)*sin(3*pi/2 - theta_1)*cos(alpha_1)*cos(3*pi/2 + theta_2) - sin(alpha_2)*sin(3*pi/2 + theta_2)*cos(3*pi/2 - theta_1))*sin(alpha_3))*sin(theta_4) + (3.5*sin(alpha_1)*sin(alpha_2)*sin(3*pi/2 - theta_1) - 3.5*sin(3*pi/2 - theta_1)*cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 + theta_2) - 3.5*sin(3*pi/2 + theta_2)*cos(alpha_2)*cos(3*pi/2 - theta_1))*sin(theta_3), (3*(-sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2) + cos(alpha_1)*cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*cos(theta_3) + 3*(sin(3*pi/2 - theta_1)*cos(alpha_2)*cos(3*pi/2 + theta_2) + sin(3*pi/2 + theta_2)*cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 - theta_1))*sin(theta_3))*cos(theta_4) + (-3.5*sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2) + 3.5*cos(alpha_1)*cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*cos(theta_3) + (3.5*sin(3*pi/2 - theta_1)*cos(alpha_2)*cos(3*pi/2 + theta_2) + 3.5*sin(3*pi/2 + theta_2)*cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 - theta_1))*sin(theta_3) + (3*(-sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2) + cos(alpha_1)*cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*sin(theta_3)*cos(alpha_3) + 3*(sin(alpha_2)*sin(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2) + sin(alpha_2)*sin(3*pi/2 + theta_2)*cos(alpha_1)*cos(3*pi/2 - theta_1))*sin(alpha_3) + 3*(-sin(3*pi/2 - theta_1)*cos(alpha_2)*cos(3*pi/2 + theta_2) - sin(3*pi/2 + theta_2)*cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 - theta_1))*cos(alpha_3)*cos(theta_3))*sin(theta_4), (-3*(sin(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2) + sin(3*pi/2 + theta_2)*cos(alpha_1)*cos(3*pi/2 - theta_1))*sin(theta_3) + 3*(sin(alpha_1)*sin(alpha_2)*cos(3*pi/2 - theta_1) + sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_2) - cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*cos(theta_3))*cos(theta_4) - (3.5*sin(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2) + 3.5*sin(3*pi/2 + theta_2)*cos(alpha_1)*cos(3*pi/2 - theta_1))*sin(theta_3) + (3*(sin(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2) + sin(3*pi/2 + theta_2)*cos(alpha_1)*cos(3*pi/2 - theta_1))*cos(alpha_3)*cos(theta_3) - 3*(-sin(alpha_1)*sin(alpha_2)*cos(3*pi/2 - theta_1) - sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_2) + cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*sin(theta_3)*cos(alpha_3))*sin(theta_4) + (3.5*sin(alpha_1)*sin(alpha_2)*cos(3*pi/2 - theta_1) + 3.5*sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_2) - 3.5*cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*cos(theta_3), -(3*(sin(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2) + sin(3*pi/2 + theta_2)*cos(alpha_1)*cos(3*pi/2 - theta_1))*cos(theta_3) - 3*(-sin(alpha_1)*sin(alpha_2)*cos(3*pi/2 - theta_1) - sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_2) + cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*sin(theta_3))*sin(theta_4) + (3*(sin(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2) + sin(3*pi/2 + theta_2)*cos(alpha_1)*cos(3*pi/2 - theta_1))*sin(theta_3)*cos(alpha_3) + 3*(-sin(alpha_1)*sin(alpha_2)*cos(3*pi/2 - theta_1) - sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2)*cos(alpha_2) + cos(alpha_1)*cos(alpha_2)*cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*cos(alpha_3)*cos(theta_3) + 3*(-sin(alpha_1)*cos(alpha_2)*cos(3*pi/2 - theta_1) + sin(alpha_2)*sin(3*pi/2 - theta_1)*sin(3*pi/2 + theta_2) - sin(alpha_2)*cos(alpha_1)*cos(3*pi/2 - theta_1)*cos(3*pi/2 + theta_2))*sin(alpha_3))*cos(theta_4)]
-, [0, (3*sin(alpha_1)*sin(theta_3)*sin(3*pi/2 + theta_2)*cos(alpha_2) + 3*sin(alpha_1)*cos(theta_3)*cos(3*pi/2 + theta_2))*cos(theta_4) + (3*sin(alpha_1)*sin(alpha_2)*sin(alpha_3)*sin(3*pi/2 + theta_2) + 3*sin(alpha_1)*sin(theta_3)*cos(alpha_3)*cos(3*pi/2 + theta_2) - 3*sin(alpha_1)*sin(3*pi/2 + theta_2)*cos(alpha_2)*cos(alpha_3)*cos(theta_3))*sin(theta_4) + 3.5*sin(alpha_1)*sin(theta_3)*sin(3*pi/2 + theta_2)*cos(alpha_2) + 3.5*sin(alpha_1)*cos(theta_3)*cos(3*pi/2 + theta_2), (3*(-sin(alpha_1)*cos(alpha_2)*cos(3*pi/2 + theta_2) - sin(alpha_2)*cos(alpha_1))*cos(theta_3) - 3*sin(alpha_1)*sin(theta_3)*sin(3*pi/2 + theta_2))*cos(theta_4) + (-3*(sin(alpha_1)*cos(alpha_2)*cos(3*pi/2 + theta_2) + sin(alpha_2)*cos(alpha_1))*sin(theta_3)*cos(alpha_3) + 3*sin(alpha_1)*sin(3*pi/2 + theta_2)*cos(alpha_3)*cos(theta_3))*sin(theta_4) + (-3.5*sin(alpha_1)*cos(alpha_2)*cos(3*pi/2 + theta_2) - 3.5*sin(alpha_2)*cos(alpha_1))*cos(theta_3) - 3.5*sin(alpha_1)*sin(theta_3)*sin(3*pi/2 + theta_2), -(-3*(sin(alpha_1)*cos(alpha_2)*cos(3*pi/2 + theta_2) + sin(alpha_2)*cos(alpha_1))*sin(theta_3) + 3*sin(alpha_1)*sin(3*pi/2 + theta_2)*cos(theta_3))*sin(theta_4) + (3*(-sin(alpha_1)*sin(alpha_2)*cos(3*pi/2 + theta_2) + cos(alpha_1)*cos(alpha_2))*sin(alpha_3) + 3*(sin(alpha_1)*cos(alpha_2)*cos(3*pi/2 + theta_2) + sin(alpha_2)*cos(alpha_1))*cos(alpha_3)*cos(theta_3) + 3*sin(alpha_1)*sin(theta_3)*sin(3*pi/2 + theta_2)*cos(alpha_3))*cos(theta_4)]
-])
+    jacobian = np.array([[3*(sin(theta_1)*sin(theta_3) - sin(theta_2)*cos(theta_1)*cos(theta_3))*cos(theta_4) + 3.5*sin(theta_1)*sin(theta_3) - 3.5*sin(theta_2)*cos(theta_1)*cos(theta_3) + 3*sin(theta_4)*cos(theta_1)*cos(theta_2), -(3.0*sin(theta_2)*sin(theta_4) + 3.0*cos(theta_2)*cos(theta_3)*cos(theta_4) + 3.5*cos(theta_2)*cos(theta_3))*sin(theta_1), 3*(sin(theta_1)*sin(theta_2)*sin(theta_3) - cos(theta_1)*cos(theta_3))*cos(theta_4) + 3.5*sin(theta_1)*sin(theta_2)*sin(theta_3) - 3.5*cos(theta_1)*cos(theta_3), 3*(sin(theta_1)*sin(theta_2)*cos(theta_3) + sin(theta_3)*cos(theta_1))*sin(theta_4) + 3*sin(theta_1)*cos(theta_2)*cos(theta_4)],[-3*(sin(theta_1)*sin(theta_2)*cos(theta_3) + sin(theta_3)*cos(theta_1))*cos(theta_4) - 3.5*sin(theta_1)*sin(theta_2)*cos(theta_3) + 3*sin(theta_1)*sin(theta_4)*cos(theta_2) - 3.5*sin(theta_3)*cos(theta_1), (3*sin(theta_2)*sin(theta_4) + 3*cos(theta_2)*cos(theta_3)*cos(theta_4) + 3.5*cos(theta_2)*cos(theta_3))*cos(theta_1), -3*(sin(theta_1)*cos(theta_3) + sin(theta_2)*sin(theta_3)*cos(theta_1))*cos(theta_4) - 3.5*sin(theta_1)*cos(theta_3) - 3.5*sin(theta_2)*sin(theta_3)*cos(theta_1), 3*(sin(theta_1)*sin(theta_3) - sin(theta_2)*cos(theta_1)*cos(theta_3))*sin(theta_4) - 3*cos(theta_1)*cos(theta_2)*cos(theta_4)],[0, -3*sin(theta_2)*cos(theta_3)*cos(theta_4) - 3.5*sin(theta_2)*cos(theta_3) + 3*sin(theta_4)*cos(theta_2), -(3.0*cos(theta_4) + 3.5)*sin(theta_3)*cos(theta_2), 3*sin(theta_2)*cos(theta_4) - 3*sin(theta_4)*cos(theta_2)*cos(theta_3)]])
+
     return jacobian
 
 
     
   def control_closed(self,image1,image2):
-    K_p = np.array([[10,0,0],[0,10,0],[0,0,10]])
-    
-    K_d = np.array([[0.1,0,0],[0,0.1,0],[0,0,0.1]])
+    kp = 0.1
+    kd = 0
+    K_p = np.array([[kp,0,0],[0,kp,0],[0,0,kp]])    
+    K_d = np.array([[kd,0,0],[0,kd,0],[0,0,kd]])
     
     cur_time = np.array([rospy.get_time()])
     dt = cur_time - self.time_previous_step
     self.time_previous_step = cur_time
     
     pos = self.forward_kinematics()
+    pos = self.calculate_end_effector_coords(image1, image2)
     
-    pos_d = self.calculate_target_position()
+    pos_d = np.array([self.target_x.data, self.target_y.data, self.target_z.data])
     
     self.error_d = ((pos_d - pos) - self.error)/dt
     
@@ -220,7 +217,7 @@ class image_converter:
     prev_pos = self.end_effector_estimation
     pos = self.forward_kinematics()
     
-    pos_d = self.calculate_target_position()
+    pos_d = np.array([self.target_x.data, self.target_y.data, self.target_z.data],)
     
     self.error_d = ((pos_d - pos) - self.error)/dt
     
