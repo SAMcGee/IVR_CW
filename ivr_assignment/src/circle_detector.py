@@ -57,10 +57,18 @@ class image_converter:
 
         cv2.waitKey(1)
         coords = self.get_circle_coords()
+        
+        target_x = Float64()
+        target_x.data = coords[0]
+        target_y = Float64()
+        target_y.data = coords[1]
+        target_z = Float64()
+        target_z.data = coords[2]
 
-        self.target_pub_x.publish(coords[0])
-        self.target_pub_y.publish(coords[1])
-        self.target_pub_z.publish(coords[2])
+
+        self.target_pub_x.publish(target_x)
+        self.target_pub_y.publish(target_y)
+        self.target_pub_z.publish(target_z)
 
     def detect_color(self, image, color):
         if color == "blue":
@@ -114,11 +122,11 @@ class image_converter:
         self.prev_z = [self.prev_z[1], return_z]
 
         # Displays on overall image where the position is detected
-        # cv2.circle(self.cv_image1, (int(return_y), int(return_z)), 3, 255, 2)
-        # cv2.imshow('cam1', self.cv_image1)
-        #
-        # cv2.circle(self.cv_image2, (int(return_x), int(return_z)), 3, 255, 2)
-        # cv2.imshow('cam2', self.cv_image2)
+        #cv2.circle(self.cv_image1, (int(return_y), int(return_z)), 3, 255, 2)
+        #cv2.imshow('cam1', self.cv_image1)
+        
+        #cv2.circle(self.cv_image2, (int(return_x), int(return_z)), 3, 255, 2)
+        #cv2.imshow('cam2', self.cv_image2)
 
         # Gets coordinates scaled
         im1_yellow = a * self.detect_color(self.cv_image1, "yellow")
@@ -128,7 +136,7 @@ class image_converter:
         # Scales x,y,z coordinates and substracts the coordinates of yellow to get the relative position
         return_array = np.array([return_x, return_y, return_z])
         return_array = a * return_array
-        return_array = yellow_coordinates - return_array
+        return_array = np.array([return_array[0]-yellow_coordinates[0], return_array[1]-yellow_coordinates[1],yellow_coordinates[2] - return_array[2]])
 
         return return_array
 

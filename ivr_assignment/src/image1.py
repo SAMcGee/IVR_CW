@@ -99,8 +99,8 @@ class image_converter:
     
     
     
-    q_d = self.control_closed(self.cv_image1, self.cv_image2)
-    #q_d = [1.2,-1.0,-0.2,1.0]
+    #q_d = self.control_closed(self.cv_image1, self.cv_image2)
+    q_d = [-3.1415,1.389,0.0,0.0]
     self.joint1=Float64()
     self.joint1.data = q_d[0]
     self.joint2=Float64()
@@ -180,8 +180,8 @@ class image_converter:
 
     
   def control_closed(self,image1,image2):
-    kp = 0.1
-    kd = 0
+    kp = 0.5
+    kd = 0.1
     K_p = np.array([[kp,0,0],[0,kp,0],[0,0,kp]])    
     K_d = np.array([[kd,0,0],[0,kd,0],[0,0,kd]])
     
@@ -190,7 +190,6 @@ class image_converter:
     self.time_previous_step = cur_time
     
     pos = self.forward_kinematics()
-    pos = self.calculate_end_effector_coords(image1, image2)
     
     pos_d = np.array([self.target_x.data, self.target_y.data, self.target_z.data])
     
