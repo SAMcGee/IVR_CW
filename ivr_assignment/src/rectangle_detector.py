@@ -25,18 +25,18 @@ class image_converter:
         # initialize the bridge between openCV and ROS
         self.bridge = CvBridge()
 
-        self.target_pub_x = rospy.Publisher("/target_x", Float64, queue_size=1)
-        self.target_pub_y = rospy.Publisher("/target_y", Float64, queue_size=1)
-        self.target_pub_z = rospy.Publisher("/target_z", Float64, queue_size=1)
+        self.target_pub_x = rospy.Publisher("/target_rect_x", Float64, queue_size=1)
+        self.target_pub_y = rospy.Publisher("/target_rect_y", Float64, queue_size=1)
+        self.target_pub_z = rospy.Publisher("/target_rect_z", Float64, queue_size=1)
 
-        self.chamfer_img = cv2.imread('template.png', 0)
+        self.chamfer_img = cv2.imread('template_rectangle.png', 0)
         self.chamfer_img = self.chamfer_img.astype(np.uint8)
 
         self.t0 = rospy.get_time()
 
-        self.prev_x = [0,0]
-        self.prev_y = [0,0]
-        self.prev_z = [0,0]
+        self.prev_x = [0, 0]
+        self.prev_y = [0, 0]
+        self.prev_z = [0, 0]
 
         self.init_flag = True
 
@@ -90,8 +90,8 @@ class image_converter:
         # would be equvialent over both images so use image1
         a = self.pixel2meter(self.cv_image1)
 
-        # Camera 1 gives us (y,z) of the orange sphere
-        # Camera 2 gives us (x,z) of the orange sphere
+        # Camera 1 gives us (y,z) of the orange rectangle
+        # Camera 2 gives us (x,z) of the orange rectangle
         im1center = self.detect_orange(self.cv_image1)
         im2center = self.detect_orange(self.cv_image2)
 
@@ -150,7 +150,7 @@ class image_converter:
                 return_value = prev[1] + (prev[1] - prev[0])
             elif prev[0] >= prev[1]:
                 return_value = prev[1] - (prev[0] - prev[1])
-        
+
         return return_value
 
     # Detect and show orange
@@ -173,13 +173,14 @@ class image_converter:
         min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(results)
 
         # Adjusts the location within the ROI to be the location in the larger image
-        img_x = int((cx - 150) + max_loc[0] + w/2)
-        img_y = int((cy - 150) + max_loc[1] + h/2)
+        img_x = int((cx - 150) + max_loc[0] + w / 2)
+        img_y = int((cy - 150) + max_loc[1] + h / 2)
 
         # cv2.circle(self.cv_image1, (img_x, img_y), 3, 255, 2)
         # cv2.imshow('result', self.cv_image1)
 
         return np.array([img_x, img_y])
+
 
 # call the class
 def main(args):
