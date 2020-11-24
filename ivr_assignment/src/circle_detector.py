@@ -95,11 +95,10 @@ class image_converter:
         im1center = self.detect_orange(self.cv_image1)
         im2center = self.detect_orange(self.cv_image2)
 
-        # TODO: Implement something to smooth this
-        if False: #not self.init_flag:
-            return_x = self.adjust_for_going_oob(im2center[0], 35, 'x')
-            return_y = self.adjust_for_going_oob(im1center[0], 35, 'y')
-            return_z = self.adjust_for_going_oob(im2center[1], 35, 'z')
+        if not self.init_flag:
+            return_x = self.adjust_for_going_oob(im2center[0], 40, 'x')
+            return_y = self.adjust_for_going_oob(im1center[0], 40, 'y')
+            return_z = self.adjust_for_going_oob(im2center[1], 40, 'z')
         else:
             return_x = (im2center[0])
             return_y = (im1center[0])
