@@ -76,7 +76,7 @@ class image_converter:
     #cv2.imwrite('image_copy.png', cv_image)
 
     im1=cv2.imshow('window1', self.cv_image1)
-    #im2=cv2.imshow('window2',self.cv_image2)
+    im2=cv2.imshow('window2',self.cv_image2)
     cv2.waitKey(1)
     print('FK vs Image')
     fk_end_effector = self.forward_kinematics()
@@ -99,8 +99,8 @@ class image_converter:
     
     
     
-    #q_d = self.control_closed(self.cv_image1, self.cv_image2)
-    q_d = [-3.1415,1.389,0.0,0.0]
+    q_d = self.control_closed(self.cv_image1, self.cv_image2)
+    #q_d = [0.0,1.5,1.0,0.0]
     self.joint1=Float64()
     self.joint1.data = q_d[0]
     self.joint2=Float64()
@@ -164,7 +164,18 @@ class image_converter:
     theta_2 = -np.pi/2-self.actual_joint2.data
     theta_3 = self.actual_joint3.data
     theta_4 = self.actual_joint4.data
+    
+    theta_1 = np.pi/2+self.actual_joint1.data
+    theta_2 = np.pi/2+self.actual_joint2.data
+    theta_3 = self.actual_joint3.data
+    theta_4 = self.actual_joint4.data
+    theta_1 = np.pi/2
+    
     end_effector = np.array([3.0*(sin(theta_1)*sin(theta_3) + cos(theta_1)*cos(theta_2)*cos(theta_3))*cos(theta_4) + 3.5*sin(theta_1)*sin(theta_3) + 3.0*sin(theta_2)*sin(theta_4)*cos(theta_1) + 3.5*cos(theta_1)*cos(theta_2)*cos(theta_3), 3.0*(sin(theta_1)*cos(theta_2)*cos(theta_3) - sin(theta_3)*cos(theta_1))*cos(theta_4) + 3.0*sin(theta_1)*sin(theta_2)*sin(theta_4) + 3.5*sin(theta_1)*cos(theta_2)*cos(theta_3) - 3.5*sin(theta_3)*cos(theta_1), -3.0*sin(theta_2)*cos(theta_3)*cos(theta_4) - 3.5*sin(theta_2)*cos(theta_3) + 3.0*sin(theta_4)*cos(theta_2) + 2.5])
+    
+    end_effector = np.array([3.0*(sin(theta_1)*sin(theta_3) + cos(theta_1)*cos(theta_2)*cos(theta_3))*cos(theta_4) + 3.5*sin(theta_1)*sin(theta_3) - 3.0*sin(theta_2)*sin(theta_4)*cos(theta_1) + 3.5*cos(theta_1)*cos(theta_2)*cos(theta_3),3.0*(sin(theta_1)*cos(theta_2)*cos(theta_3) - sin(theta_3)*cos(theta_1))*cos(theta_4) - 3.0*sin(theta_1)*sin(theta_2)*sin(theta_4) + 3.5*sin(theta_1)*cos(theta_2)*cos(theta_3) - 3.5*sin(theta_3)*cos(theta_1),3.0*sin(theta_2)*cos(theta_3)*cos(theta_4) + 3.5*sin(theta_2)*cos(theta_3) + 3.0*sin(theta_4)*cos(theta_2) + 2.5])
+    
+    end_effector = np.array([3.0*(sin(theta_1)*sin(theta_3) + cos(theta_1)*cos(theta_2)*cos(theta_3))*cos(theta_4) + 3.5*sin(theta_1)*sin(theta_3) - 3.0*sin(theta_2)*sin(theta_4)*cos(theta_1) + 3.5*cos(theta_1)*cos(theta_2)*cos(theta_3),3.0*(sin(theta_1)*cos(theta_2)*cos(theta_3) - sin(theta_3)*cos(theta_1))*cos(theta_4) - 3.0*sin(theta_1)*sin(theta_2)*sin(theta_4) + 3.5*sin(theta_1)*cos(theta_2)*cos(theta_3) - 3.5*sin(theta_3)*cos(theta_1),3.0*sin(theta_2)*cos(theta_3)*cos(theta_4) + 3.5*sin(theta_2)*cos(theta_3) + 3.0*sin(theta_4)*cos(theta_2) + 2.5])
     return end_effector
     
   def calculate_jacobian(self):
@@ -173,7 +184,19 @@ class image_converter:
     theta_3 = self.actual_joint3.data
     theta_4 = self.actual_joint4.data
     
+    theta_1 = np.pi/2+self.actual_joint1.data
+    theta_2 = np.pi/2+self.actual_joint2.data
+    theta_3 = self.actual_joint3.data
+    theta_4 = self.actual_joint4.data
+    theta_1 = np.pi/2
+    
     jacobian = np.array([[3*(sin(theta_1)*sin(theta_3) - sin(theta_2)*cos(theta_1)*cos(theta_3))*cos(theta_4) + 3.5*sin(theta_1)*sin(theta_3) - 3.5*sin(theta_2)*cos(theta_1)*cos(theta_3) + 3*sin(theta_4)*cos(theta_1)*cos(theta_2), -(3.0*sin(theta_2)*sin(theta_4) + 3.0*cos(theta_2)*cos(theta_3)*cos(theta_4) + 3.5*cos(theta_2)*cos(theta_3))*sin(theta_1), 3*(sin(theta_1)*sin(theta_2)*sin(theta_3) - cos(theta_1)*cos(theta_3))*cos(theta_4) + 3.5*sin(theta_1)*sin(theta_2)*sin(theta_3) - 3.5*cos(theta_1)*cos(theta_3), 3*(sin(theta_1)*sin(theta_2)*cos(theta_3) + sin(theta_3)*cos(theta_1))*sin(theta_4) + 3*sin(theta_1)*cos(theta_2)*cos(theta_4)],[-3*(sin(theta_1)*sin(theta_2)*cos(theta_3) + sin(theta_3)*cos(theta_1))*cos(theta_4) - 3.5*sin(theta_1)*sin(theta_2)*cos(theta_3) + 3*sin(theta_1)*sin(theta_4)*cos(theta_2) - 3.5*sin(theta_3)*cos(theta_1), (3*sin(theta_2)*sin(theta_4) + 3*cos(theta_2)*cos(theta_3)*cos(theta_4) + 3.5*cos(theta_2)*cos(theta_3))*cos(theta_1), -3*(sin(theta_1)*cos(theta_3) + sin(theta_2)*sin(theta_3)*cos(theta_1))*cos(theta_4) - 3.5*sin(theta_1)*cos(theta_3) - 3.5*sin(theta_2)*sin(theta_3)*cos(theta_1), 3*(sin(theta_1)*sin(theta_3) - sin(theta_2)*cos(theta_1)*cos(theta_3))*sin(theta_4) - 3*cos(theta_1)*cos(theta_2)*cos(theta_4)],[0, -3*sin(theta_2)*cos(theta_3)*cos(theta_4) - 3.5*sin(theta_2)*cos(theta_3) + 3*sin(theta_4)*cos(theta_2), -(3.0*cos(theta_4) + 3.5)*sin(theta_3)*cos(theta_2), 3*sin(theta_2)*cos(theta_4) - 3*sin(theta_4)*cos(theta_2)*cos(theta_3)]])
+    
+    jacobian = np.array([[3*(sin(theta_1)*sin(theta_3) - sin(theta_2)*cos(theta_1)*cos(theta_3))*cos(theta_4) + 3.5*sin(theta_1)*sin(theta_3) - 3.5*sin(theta_2)*cos(theta_1)*cos(theta_3) + 3*sin(theta_4)*cos(theta_1)*cos(theta_2), -(3.0*sin(theta_2)*sin(theta_4) + 3.0*cos(theta_2)*cos(theta_3)*cos(theta_4) + 3.5*cos(theta_2)*cos(theta_3))*sin(theta_1), 3*(sin(theta_1)*sin(theta_2)*sin(theta_3) - cos(theta_1)*cos(theta_3))*cos(theta_4) + 3.5*sin(theta_1)*sin(theta_2)*sin(theta_3) - 3.5*cos(theta_1)*cos(theta_3), 3*(sin(theta_1)*sin(theta_2)*cos(theta_3) + sin(theta_3)*cos(theta_1))*sin(theta_4) + 3*sin(theta_1)*cos(theta_2)*cos(theta_4)],[-3*(sin(theta_1)*sin(theta_2)*cos(theta_3) + sin(theta_3)*cos(theta_1))*cos(theta_4) - 3.5*sin(theta_1)*sin(theta_2)*cos(theta_3) + 3*sin(theta_1)*sin(theta_4)*cos(theta_2) - 3.5*sin(theta_3)*cos(theta_1), (3*sin(theta_2)*sin(theta_4) + 3*cos(theta_2)*cos(theta_3)*cos(theta_4) + 3.5*cos(theta_2)*cos(theta_3))*cos(theta_1), -3*(sin(theta_1)*cos(theta_3) + sin(theta_2)*sin(theta_3)*cos(theta_1))*cos(theta_4) - 3.5*sin(theta_1)*cos(theta_3) - 3.5*sin(theta_2)*sin(theta_3)*cos(theta_1), 3*(sin(theta_1)*sin(theta_3) - sin(theta_2)*cos(theta_1)*cos(theta_3))*sin(theta_4) - 3*cos(theta_1)*cos(theta_2)*cos(theta_4)], [0, -3*sin(theta_2)*cos(theta_3)*cos(theta_4) - 3.5*sin(theta_2)*cos(theta_3) + 3*sin(theta_4)*cos(theta_2), -(3.0*cos(theta_4) + 3.5)*sin(theta_3)*cos(theta_2), 3*sin(theta_2)*cos(theta_4) - 3*sin(theta_4)*cos(theta_2)*cos(theta_3)]])
+    
+    jacobian = np.array([[3*(sin(theta_1)*sin(theta_3) - sin(theta_2)*cos(theta_1)*cos(theta_3))*cos(theta_4) + 3.5*sin(theta_1)*sin(theta_3) - 3.5*sin(theta_2)*cos(theta_1)*cos(theta_3) + 3*sin(theta_4)*cos(theta_1)*cos(theta_2), -(3.0*sin(theta_2)*sin(theta_4) + 3.0*cos(theta_2)*cos(theta_3)*cos(theta_4) + 3.5*cos(theta_2)*cos(theta_3))*sin(theta_1), 3*(sin(theta_1)*sin(theta_2)*sin(theta_3) - cos(theta_1)*cos(theta_3))*cos(theta_4) + 3.5*sin(theta_1)*sin(theta_2)*sin(theta_3) - 3.5*cos(theta_1)*cos(theta_3), 3*(sin(theta_1)*sin(theta_2)*cos(theta_3) + sin(theta_3)*cos(theta_1))*sin(theta_4) + 3*sin(theta_1)*cos(theta_2)*cos(theta_4)],[-3*(sin(theta_1)*sin(theta_2)*cos(theta_3) + sin(theta_3)*cos(theta_1))*cos(theta_4) - 3.5*sin(theta_1)*sin(theta_2)*cos(theta_3) + 3*sin(theta_1)*sin(theta_4)*cos(theta_2) - 3.5*sin(theta_3)*cos(theta_1), (3*sin(theta_2)*sin(theta_4) + 3*cos(theta_2)*cos(theta_3)*cos(theta_4) + 3.5*cos(theta_2)*cos(theta_3))*cos(theta_1), -3*(sin(theta_1)*cos(theta_3) + sin(theta_2)*sin(theta_3)*cos(theta_1))*cos(theta_4) - 3.5*sin(theta_1)*cos(theta_3) - 3.5*sin(theta_2)*sin(theta_3)*cos(theta_1), 3*(sin(theta_1)*sin(theta_3) - sin(theta_2)*cos(theta_1)*cos(theta_3))*sin(theta_4) - 3*cos(theta_1)*cos(theta_2)*cos(theta_4)],[0, -3*sin(theta_2)*cos(theta_3)*cos(theta_4) - 3.5*sin(theta_2)*cos(theta_3) + 3*sin(theta_4)*cos(theta_2), -(3.0*cos(theta_4) + 3.5)*sin(theta_3)*cos(theta_2), 3*sin(theta_2)*cos(theta_4) - 3*sin(theta_4)*cos(theta_2)*cos(theta_3)]])
+    
+    jacobian = np.array([[0, -(3.0*sin(theta_2)*sin(theta_4) + 3.0*cos(theta_2)*cos(theta_3)*cos(theta_4) + 3.5*cos(theta_2)*cos(theta_3))*sin(theta_1), 3*(sin(theta_1)*sin(theta_2)*sin(theta_3) - cos(theta_1)*cos(theta_3))*cos(theta_4) + 3.5*sin(theta_1)*sin(theta_2)*sin(theta_3) - 3.5*cos(theta_1)*cos(theta_3), 3*(sin(theta_1)*sin(theta_2)*cos(theta_3) + sin(theta_3)*cos(theta_1))*sin(theta_4) + 3*sin(theta_1)*cos(theta_2)*cos(theta_4)],[0, (3*sin(theta_2)*sin(theta_4) + 3*cos(theta_2)*cos(theta_3)*cos(theta_4) + 3.5*cos(theta_2)*cos(theta_3))*cos(theta_1), -3*(sin(theta_1)*cos(theta_3) + sin(theta_2)*sin(theta_3)*cos(theta_1))*cos(theta_4) - 3.5*sin(theta_1)*cos(theta_3) - 3.5*sin(theta_2)*sin(theta_3)*cos(theta_1), 3*(sin(theta_1)*sin(theta_3) - sin(theta_2)*cos(theta_1)*cos(theta_3))*sin(theta_4) - 3*cos(theta_1)*cos(theta_2)*cos(theta_4)],[0, -3*sin(theta_2)*cos(theta_3)*cos(theta_4) - 3.5*sin(theta_2)*cos(theta_3) + 3*sin(theta_4)*cos(theta_2), -(3.0*cos(theta_4) + 3.5)*sin(theta_3)*cos(theta_2), 3*sin(theta_2)*cos(theta_4) - 3*sin(theta_4)*cos(theta_2)*cos(theta_3)]])
 
     return jacobian
 
@@ -181,7 +204,7 @@ class image_converter:
     
   def control_closed(self,image1,image2):
     kp = 0.5
-    kd = 0.1
+    kd = 0.3
     K_p = np.array([[kp,0,0],[0,kp,0],[0,0,kp]])    
     K_d = np.array([[kd,0,0],[0,kd,0],[0,0,kd]])
     
@@ -192,7 +215,6 @@ class image_converter:
     pos = self.forward_kinematics()
     
     pos_d = np.array([self.target_x.data, self.target_y.data, self.target_z.data])
-    
     self.error_d = ((pos_d - pos) - self.error)/dt
     
     self.error = pos_d-pos
