@@ -108,7 +108,7 @@ class image_converter:
     
     
     #q_d = self.control_closed(self.cv_image1, self.cv_image2)
-    q_d = self.null_space()
+    #q_d = self.null_space()
     #q_d = [0.0,1.5,1.0,0.0]
     self.joint1=Float64()
     self.joint1.data = q_d[0]
