@@ -46,6 +46,9 @@ class image_converter:
         self.robot_joint2_angle_estimate_pub = rospy.Publisher("/robot/joint2_angle_est", Float64, queue_size=10)
         self.robot_joint3_angle_estimate_pub = rospy.Publisher("/robot/joint3_angle_est", Float64, queue_size=10)
         self.robot_joint4_angle_estimate_pub = rospy.Publisher("/robot/joint4_angle_est", Float64, queue_size=10)
+        
+        # Publishers for estimated end-effector position
+        self.robot_red_blob_pub = rospy.Publisher("/robot/red_blob_position", Float64MultiArray, queue_size=10)
 
         # Subscribers to recieve both images
         self.image_sub1 = rospy.Subscriber("/camera1/robot/image_raw", Image, self.callback1)
@@ -71,12 +74,15 @@ class image_converter:
 
         self.move_robot()
         self.joints = Float64MultiArray
+        self.red_blob_loc = Float64MultiArray
         self.joints.data = self.detect_joint_angles(self.cv_image1, self.cv_image2)
 
         # Publish the results
         try:
             self.image_pub2.publish(self.bridge.cv2_to_imgmsg(self.cv_image2, "bgr8"))
-
+            
+            self.robot_red_blob_pub.publish(self.red_blob_loc)
+            
             self.robot_joint2_angle_estimate_pub.publish(self.joints.data[0])
             self.robot_joint3_angle_estimate_pub.publish(self.joints.data[1])
             self.robot_joint4_angle_estimate_pub.publish(self.joints.data[2])
@@ -147,6 +153,8 @@ class image_converter:
         im2_blue = a * self.detect_color(image2, "blue")
         im2_green = a * self.detect_color(image2, "green")
         im2_red = a * self.detect_color(image2, "red")
+        
+        self.red_blob_loc = np.array([im2_red[0], im1_red[0], im2_red[1]])
 
         # Camera 1 gives us (y,z)
         # Camera 2 gives us (x,z)
