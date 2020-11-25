@@ -57,10 +57,18 @@ class image_converter:
     self.target_y_sub = rospy.Subscriber('/target_y', Float64, self.target_y_callback)
     self.target_z_sub = rospy.Subscriber('/target_z', Float64, self.target_z_callback)
     
+    self.rectangle_x_sub = rospy.Subscriber('/target_rect_x', Float64, self.rectangle_x_callback)
+    self.rectangle_y_sub = rospy.Subscriber('/target_rect_y', Float64, self.rectangle_y_callback)
+    self.rectangle_z_sub = rospy.Subscriber('/target_rect_z', Float64, self.rectangle_z_callback)    
+    
     self.end_effector_estimation = Float64MultiArray()
+    self.end_effector_estimation.data = [0.0,0.0,0.0]
     self.target_x = Float64()    
     self.target_y = Float64()    
     self.target_z = Float64()
+    self.rectangle_x = Float64()
+    self.rectangle_y = Float64()
+    self.rectangle_z = Float64()
     
 
 
@@ -75,8 +83,8 @@ class image_converter:
     # Uncomment if you want to save the image
     #cv2.imwrite('image_copy.png', cv_image)
 
-    im1=cv2.imshow('window1', self.cv_image1)
-    im2=cv2.imshow('window2',self.cv_image2)
+    ##im1=cv2.imshow('window1', self.cv_image1)
+    ##im2=cv2.imshow('window2',self.cv_image2)
     cv2.waitKey(1)
     print('FK vs Image')
     fk_end_effector = self.forward_kinematics()
@@ -99,7 +107,8 @@ class image_converter:
     
     
     
-    q_d = self.control_closed(self.cv_image1, self.cv_image2)
+    #q_d = self.control_closed(self.cv_image1, self.cv_image2)
+    q_d = self.null_space()
     #q_d = [0.0,1.5,1.0,0.0]
     self.joint1=Float64()
     self.joint1.data = q_d[0]
@@ -110,7 +119,8 @@ class image_converter:
     self.joint4=Float64()
     self.joint4.data = q_d[3]
     
-    self.end_effector_estimation = fk_end_effector
+    self.end_effector_estimation.data = [fk_end_effector[0],fk_end_effector[1],fk_end_effector[2]]
+
     
     # Publish the results
     try: 
@@ -155,7 +165,13 @@ class image_converter:
     
   def target_z_callback(self, data):
     self.target_z = data
-    
+  
+  def rectangle_x_callback(self, data):
+    self.rectangle_x = data
+  def rectangle_y_callback(self, data):
+    self.rectangle_y = data
+  def rectangle_z_callback(self, data):
+    self.rectangle_z = data        
     
    
   
@@ -169,7 +185,6 @@ class image_converter:
     theta_2 = np.pi/2+self.actual_joint2.data
     theta_3 = self.actual_joint3.data
     theta_4 = self.actual_joint4.data
-    theta_1 = np.pi/2
     
     end_effector = np.array([3.0*(sin(theta_1)*sin(theta_3) + cos(theta_1)*cos(theta_2)*cos(theta_3))*cos(theta_4) + 3.5*sin(theta_1)*sin(theta_3) + 3.0*sin(theta_2)*sin(theta_4)*cos(theta_1) + 3.5*cos(theta_1)*cos(theta_2)*cos(theta_3), 3.0*(sin(theta_1)*cos(theta_2)*cos(theta_3) - sin(theta_3)*cos(theta_1))*cos(theta_4) + 3.0*sin(theta_1)*sin(theta_2)*sin(theta_4) + 3.5*sin(theta_1)*cos(theta_2)*cos(theta_3) - 3.5*sin(theta_3)*cos(theta_1), -3.0*sin(theta_2)*cos(theta_3)*cos(theta_4) - 3.5*sin(theta_2)*cos(theta_3) + 3.0*sin(theta_4)*cos(theta_2) + 2.5])
     
@@ -227,34 +242,39 @@ class image_converter:
     return q_d
     
   def null_space(self):
-    K_p = np.array([[10,0,0],[0,10,0],[0,0,10]])
+    kp = 0.45
+    kd = 0.1
+    K_p = np.array([[kp,0,0],[0,kp,0],[0,0,kp]])
     
-    K_d = np.array([[0.1,0,0],[0,0.1,0],[0,0,0.1]])
+    K_d = np.array([[kd,0,0],[0,kd,0],[0,0,kd]])
     
     cur_time = np.array([rospy.get_time()])
     dt = cur_time - self.time_previous_step
     self.time_previous_step = cur_time
-    square_pos = np.array([5.0,4.0,3.0])
-    prev_pos = self.end_effector_estimation
+    rectangle_pos = np.array([self.rectangle_x.data, self.rectangle_y.data, self.rectangle_z.data])
+    prev_pos = np.array([self.end_effector_estimation.data[0], self.end_effector_estimation.data[1], self.end_effector_estimation.data[2]])
     pos = self.forward_kinematics()
     
-    pos_d = np.array([self.target_x.data, self.target_y.data, self.target_z.data],)
+    pos_d = np.array([self.target_x.data, self.target_y.data, self.target_z.data])
     
     self.error_d = ((pos_d - pos) - self.error)/dt
     
     self.error = pos_d-pos
-    
-    wprev = np.linalg.norm(prev_pos - square_pos)
-    w = np.linalg.norm(pos - square_pos)
-    w_diff = w - wprev
-    
-    dq0 = np.array([(w_diff/q_diff[0]), w_diff/q_diff[1], w_diff/q_diff[2]])
+
     
     q = np.array([self.actual_joint1.data, self.actual_joint2.data, self.actual_joint3.data, self.actual_joint4.data])
+    q_prev = np.array([self.previous_joint1.data, self.previous_joint2.data, self.previous_joint3.data, self.previous_joint4.data])
+    q_diff = q - q_prev
+    wprev = np.linalg.norm(prev_pos - rectangle_pos)
+    w = np.linalg.norm(pos - rectangle_pos)
+    w_diff = w - wprev
     
-    J_inv = np.linalg.pinv(self.calculate_jacobian())
-    dq_d = np.dot(J_inv, (np.dot(K_d, self.error_d.transpose()) + np.dot(K_p, self.error.transpose()))) + np.dot((np.eye(3,3) - np.dot(J_inv,J)),dq0)
+    dq0 = np.array([(w_diff/q_diff[0]), w_diff/q_diff[1], w_diff/q_diff[2], w_diff/q_diff[3]])
+    J = self.calculate_jacobian()
+    J_inv = np.linalg.pinv(J)
+    dq_d = np.dot(J_inv, (np.dot(K_d, self.error_d.transpose()) + np.dot(K_p, self.error.transpose()))) + np.dot((np.eye(4,4) - np.dot(J_inv,J)),dq0)
     q_d = q + (dt * dq_d)
+    return q_d
   
     
   def detect_color(self, image, color):
