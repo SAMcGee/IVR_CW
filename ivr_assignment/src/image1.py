@@ -70,6 +70,7 @@ class image_converter:
     self.rectangle_y = Float64()
     self.rectangle_z = Float64()
     
+    
 
 
   # Recieve data from camera 1, process it, and publish
@@ -83,7 +84,7 @@ class image_converter:
     # Uncomment if you want to save the image
     #cv2.imwrite('image_copy.png', cv_image)
 
-    ##im1=cv2.imshow('window1', self.cv_image1)
+    im1=cv2.imshow('window1', self.cv_image1)
     ##im2=cv2.imshow('window2',self.cv_image2)
     cv2.waitKey(1)
     print('FK vs Image')
@@ -103,13 +104,14 @@ class image_converter:
     
     
     image_end_effector = self.calculate_end_effector_coords(self.cv_image1,self.cv_image2)
+    print(fk_end_effector)
     print(image_end_effector)
     
     
     
     #q_d = self.control_closed(self.cv_image1, self.cv_image2)
     #q_d = self.null_space()
-    #q_d = [0.0,1.5,1.0,0.0]
+    q_d = [-0.7,-1.4,-1.2,-0.6]
     self.joint1=Float64()
     self.joint1.data = q_d[0]
     self.joint2=Float64()
