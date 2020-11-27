@@ -90,16 +90,12 @@ class image_converter:
     # Uncomment if you want to save the image
     #cv2.imwrite('image_copy.png', cv_image)
 
-    im1=cv2.imshow('window1', self.cv_image1)
+    ##im1=cv2.imshow('window1', self.cv_image1)
     ##im2=cv2.imshow('window2',self.cv_image2)
     cv2.waitKey(1)
-    print('FK vs Image')
+
+    # Get Forward Kinematics estimation of end effector
     fk_end_effector = self.forward_kinematics()
-    print(fk_end_effector)
-    print(self.actual_joint1)
-    print(self.actual_joint2)
-    print(self.actual_joint3)
-    print(self.actual_joint4)
     
     self.fk_x = Float64()
     self.fk_x.data = fk_end_effector[0]
@@ -110,17 +106,18 @@ class image_converter:
     
     # Get vision estimation of end effector    
     image_end_effector = self.calculate_end_effector_coords(self.cv_image1,self.cv_image2)
+    print('FK vs Image')
     print(fk_end_effector)
     print(image_end_effector)
     
     q_d = None
     #CLOSED CONTROL - uncomment two lines below for closed control
-    #q_d = self.control_closed(self.cv_image1, self.cv_image1)
+    #q_d = self.control_closed()
     #q_d[0] = 0.0 # Fix joint 1 at 0.0
     
     #NULL-SPACE CONTROL - uncomment two lines below for null-space control
-    q_d = self.null_space()
-    q_d[0] = 0.0 # Fix joint 1 at 0.0
+    #q_d = self.null_space()
+    #q_d[0] = 0.0 # Fix joint 1 at 0.0
     
     #MANUAL POSITIONING - uncomment line below to manually assign joint angles
     #q_d = [-0.7,-1.4,-1.2,-0.6]
@@ -214,13 +211,16 @@ class image_converter:
         
     jacobian = np.array([[3*(sin(theta_1)*sin(theta_3) - sin(theta_2)*cos(theta_1)*cos(theta_3))*cos(theta_4) + 3.5*sin(theta_1)*sin(theta_3) - 3.5*sin(theta_2)*cos(theta_1)*cos(theta_3) + 3*sin(theta_4)*cos(theta_1)*cos(theta_2), -(3.0*sin(theta_2)*sin(theta_4) + 3.0*cos(theta_2)*cos(theta_3)*cos(theta_4) + 3.5*cos(theta_2)*cos(theta_3))*sin(theta_1), 3*(sin(theta_1)*sin(theta_2)*sin(theta_3) - cos(theta_1)*cos(theta_3))*cos(theta_4) + 3.5*sin(theta_1)*sin(theta_2)*sin(theta_3) - 3.5*cos(theta_1)*cos(theta_3), 3*(sin(theta_1)*sin(theta_2)*cos(theta_3) + sin(theta_3)*cos(theta_1))*sin(theta_4) + 3*sin(theta_1)*cos(theta_2)*cos(theta_4)],[-3*(sin(theta_1)*sin(theta_2)*cos(theta_3) + sin(theta_3)*cos(theta_1))*cos(theta_4) - 3.5*sin(theta_1)*sin(theta_2)*cos(theta_3) + 3*sin(theta_1)*sin(theta_4)*cos(theta_2) - 3.5*sin(theta_3)*cos(theta_1), (3*sin(theta_2)*sin(theta_4) + 3*cos(theta_2)*cos(theta_3)*cos(theta_4) + 3.5*cos(theta_2)*cos(theta_3))*cos(theta_1), -3*(sin(theta_1)*cos(theta_3) + sin(theta_2)*sin(theta_3)*cos(theta_1))*cos(theta_4) - 3.5*sin(theta_1)*cos(theta_3) - 3.5*sin(theta_2)*sin(theta_3)*cos(theta_1), 3*(sin(theta_1)*sin(theta_3) - sin(theta_2)*cos(theta_1)*cos(theta_3))*sin(theta_4) - 3*cos(theta_1)*cos(theta_2)*cos(theta_4)],[0, -3*sin(theta_2)*cos(theta_3)*cos(theta_4) - 3.5*sin(theta_2)*cos(theta_3) + 3*sin(theta_4)*cos(theta_2), -(3.0*cos(theta_4) + 3.5)*sin(theta_3)*cos(theta_2), 3*sin(theta_2)*cos(theta_4) - 3*sin(theta_4)*cos(theta_2)*cos(theta_3)]])
     
-    jacobian = np.array([[0, -(3.0*sin(theta_2)*sin(theta_4) + 3.0*cos(theta_2)*cos(theta_3)*cos(theta_4) + 3.5*cos(theta_2)*cos(theta_3))*sin(theta_1), 3*(sin(theta_1)*sin(theta_2)*sin(theta_3) - cos(theta_1)*cos(theta_3))*cos(theta_4) + 3.5*sin(theta_1)*sin(theta_2)*sin(theta_3) - 3.5*cos(theta_1)*cos(theta_3), 3*(sin(theta_1)*sin(theta_2)*cos(theta_3) + sin(theta_3)*cos(theta_1))*sin(theta_4) + 3*sin(theta_1)*cos(theta_2)*cos(theta_4)],[0, (3*sin(theta_2)*sin(theta_4) + 3*cos(theta_2)*cos(theta_3)*cos(theta_4) + 3.5*cos(theta_2)*cos(theta_3))*cos(theta_1), -3*(sin(theta_1)*cos(theta_3) + sin(theta_2)*sin(theta_3)*cos(theta_1))*cos(theta_4) - 3.5*sin(theta_1)*cos(theta_3) - 3.5*sin(theta_2)*sin(theta_3)*cos(theta_1), 3*(sin(theta_1)*sin(theta_3) - sin(theta_2)*cos(theta_1)*cos(theta_3))*sin(theta_4) - 3*cos(theta_1)*cos(theta_2)*cos(theta_4)],[0, -3*sin(theta_2)*cos(theta_3)*cos(theta_4) - 3.5*sin(theta_2)*cos(theta_3) + 3*sin(theta_4)*cos(theta_2), -(3.0*cos(theta_4) + 3.5)*sin(theta_3)*cos(theta_2), 3*sin(theta_2)*cos(theta_4) - 3*sin(theta_4)*cos(theta_2)*cos(theta_3)]])
+    # Keep joint 1 angle fixed as only require 3 degrees of freedom
+    jacobian[0][0] = 0
+    jacobian[1][0] = 0
+    jacobian[2][0] = 0
 
     return jacobian
 
 
     
-  def control_closed(self,image1,image2):
+  def control_closed(self):
     #PD control values
     kp = 0.5
     kd = 0.3
