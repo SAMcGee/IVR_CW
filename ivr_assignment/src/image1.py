@@ -114,18 +114,18 @@ class image_converter:
     print(image_end_effector)
     
     q_d = None
-    #CLOSED LOOP CONTROL
-    q_d = self.control_closed(self.cv_image1, self.cv_image1)
-    q_d[0] = 0.0 # Fix joint 1 at 0.0
-    
-    #NULL SPACE CONTROL
-    #q_d = np.array([0.0, self.null_space()[1:]])
+    #CLOSED CONTROL - uncomment two lines below for closed control
+    #q_d = self.control_closed(self.cv_image1, self.cv_image1)
     #q_d[0] = 0.0 # Fix joint 1 at 0.0
     
-    #MANUAL POSITIONING
+    #NULL-SPACE CONTROL - uncomment two lines below for null-space control
+    q_d = self.null_space()
+    q_d[0] = 0.0 # Fix joint 1 at 0.0
+    
+    #MANUAL POSITIONING - uncomment line below to manually assign joint angles
     #q_d = [-0.7,-1.4,-1.2,-0.6]
     
-    #Uncomment all for closed loop and null space control`	/q.
+    #Only assign joint angles for publishing if desired q is set
     if q_d is not None:
       self.joint1=Float64()
       self.joint1.data = q_d[0]
@@ -247,8 +247,8 @@ class image_converter:
     
   def null_space(self):
     #PD control values
-    kp = 0.45
-    kd = 0.1
+    kp = 0.7
+    kd = 0.5
     K_p = np.array([[kp,0,0],[0,kp,0],[0,0,kp]])
     
     K_d = np.array([[kd,0,0],[0,kd,0],[0,0,kd]])
